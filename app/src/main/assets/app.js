@@ -1,9 +1,10 @@
-/* CHEMFORGE Android Enterprise v1.3 — offline-only learning + optional in-process local inference. */
+/* CHEMFORGE Android Enterprise v1.4 — offline-only learning + optional in-process local inference. */
 (()=>{
 'use strict';
 const data=window.CF_DATA;
 const E=window.ChemEngine;
 const Coach=window.ChemCoach;
+const Diagnostics=window.ChemModelDiagnostics;
 const policy=window.CF_ENTERPRISE_POLICY||{tenant_id:'',enable_local_ai:true,allow_data_export:true,allow_data_import:true,allow_content_import:false};
 const tenant=policy.tenant_id||window.CF_PACK_INFO?.tenant_id||'';
 const fingerprint=window.CF_PACK_INFO?.content_sha256||data.content_version;
@@ -52,6 +53,7 @@ try {
 } catch(err){storageProblem=true;storageLocked=nativeRecordStore;console.warn('Local study record unavailable:',err.message);}
 let mode='diagnostic',screen='home',q=null,selection='',hintsUsed=0,hasSubmitted=false,lastQuestion='';
 let coachSequence=0, activeCoachRequest='';
+let benchmarkSequence=0, activeBenchmarkRequest='';
 const institutionStatus=$('institution-status');
 if (window.CF_PACK_INFO) {
  institutionStatus.textContent='Signed pack: '+window.CF_PACK_INFO.content_version+' · Institution: '+window.CF_PACK_INFO.tenant_id+' · Revision '+window.CF_PACK_INFO.pack_version+' (publisher signature verified; academic accuracy not independently validated).';
@@ -270,6 +272,18 @@ window.receiveChemforgeImport=function(raw){
 };
 window.receiveChemforgeModelEvent=function(kind, requestId, text){
  if(kind==='status' || (kind==='error' && !requestId)) { $('model-status').textContent=text; return; }
+ if(activeBenchmarkRequest && requestId===activeBenchmarkRequest){
+   const node=$('model-diagnostics');
+   if(kind==='benchmark'){
+     try { node.textContent=Diagnostics.formatBenchmark(text); }
+     catch(_) { node.textContent='Invalid or unverified offline diagnostic result.'; }
+   } else if(kind==='error')node.textContent='Offline AI diagnostic unavailable: '+text;
+   else if(kind==='progress')node.textContent=text;
+   if(kind==='benchmark'||kind==='error'){
+     activeBenchmarkRequest='';$('model-benchmark').disabled=false;
+   }
+   return;
+ }
  if(!activeCoachRequest || requestId!==activeCoachRequest)return;
  if(kind==='answer'||kind==='error'||kind==='progress') {
    Coach.renderResponse($('coach-output'),text);
@@ -280,6 +294,16 @@ $('learn-domain').addEventListener('change',renderLessons);
 $('model-unload').addEventListener('click',()=>{
  if(window.ChemforgeNative?.unloadModel)window.ChemforgeNative.unloadModel();
  else $('model-status').textContent='Model controls require the Android app.';
+});
+$('model-benchmark').addEventListener('click',()=>{
+ if(!policy.enable_local_ai)return;
+ if(!window.ChemforgeNative?.benchmarkModel){
+   $('model-diagnostics').textContent='Offline inference self-test requires the Android application.';return;
+ }
+ activeBenchmarkRequest='bench-'+(++benchmarkSequence);
+ $('model-benchmark').disabled=true;
+ $('model-diagnostics').textContent='Verifying the approved local model and running a short CPU inference test…';
+ window.ChemforgeNative.benchmarkModel(activeBenchmarkRequest);
 });
 $('model-import').addEventListener('click',()=>{
  if(window.ChemforgeNative?.importModel)window.ChemforgeNative.importModel();

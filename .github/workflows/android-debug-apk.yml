@@ -1,4 +1,4 @@
-name: Verify and build CHEMFORGE Enterprise v1.3 (offline debug)
+name: Verify and build CHEMFORGE Enterprise v1.4 (offline debug)
 on:
   workflow_dispatch:
   push:
@@ -92,7 +92,7 @@ jobs:
       - name: Archive debug APK and checksums
         uses: actions/upload-artifact@v4
         with:
-          name: CHEMFORGE-Enterprise-v1.3-offline-debug-apk
+          name: CHEMFORGE-Enterprise-v1.4-offline-debug-apk
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/debug/apk-sha256.txt

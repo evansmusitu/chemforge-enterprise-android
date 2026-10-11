@@ -11,6 +11,7 @@
 <script defer src="enterprise_policy.js"></script>
 <script defer src="engine.js"></script>
 <script defer src="coach.js"></script>
+<script defer src="model_diagnostics.js"></script>
 <script defer src="lessons.js"></script>
 <script defer src="mock.js"></script>
 <script defer src="app.js"></script>
@@ -20,7 +21,7 @@
   <header class="top"><div class="logo"><div class="symbol">⌬</div><div><b>CHEM<span>FORGE</span></b><small>ADVANCED CHEMISTRY • ZIMBABWE</small></div></div><div class="offline"><i></i> OFFLINE</div></header>
   <main id="main">
   <section id="screen-home" class="screen active">
-    <div class="eyebrow">LEARNING INTELLIGENCE / ENTERPRISE 1.3-alpha</div>
+    <div class="eyebrow">LEARNING INTELLIGENCE / ENTERPRISE 1.4-alpha</div>
     <div class="hero"><span class="hero-kicker">YOUR CHEMISTRY, DECODED.</span><h1>Think deeper.<br/><em>Score smarter.</em></h1><p>Practise, diagnose and retain essential A-Level chemistry skills — even without internet.</p><button id="start-study" class="button primary">Start adaptive practice <span>→</span></button></div>
     <div class="card" id="institution-card"><span class="badge">OFFLINE INSTITUTIONAL CONTENT</span><h3>Enterprise deployment</h3>
       <p id="institution-status" class="minor">Pilot content installed. No institutional curriculum pack active.</p>
@@ -34,6 +35,9 @@
       <p id="model-status" class="minor" aria-live="polite">Checking model availability…</p>
       <button type="button" id="model-import" class="button secondary full">Import on-device model ↥</button>
       <button type="button" id="model-unload" class="button secondary full">Unload AI to free phone memory ⏻</button>
+      <button type="button" id="model-benchmark" class="button secondary full">Run offline AI self-test ◴</button>
+      <pre class="model-diagnostics" id="model-diagnostics" role="status" aria-live="polite"></pre>
+      <p class="minor">Self-test uses a fixed non-student prompt, reports device-only timings and RAM, and never changes scores. An approved model must be installed first.</p>
       <p class="minor">Model not bundled. Transfer your institution-approved .litertlm file, then import locally. Integrity and memory headroom are checked before loading. AI explanations are unverified and never used to award marks.</p>
     </div>
     <div class="notice"><span>✳</span><div><b>Research pilot, not an official ZIMSEC app.</b><p>Default pilot: 44 unreviewed original questions and 28 provisional topic mappings. Institution-provided packs may differ; no grade predictions.</p></div></div>

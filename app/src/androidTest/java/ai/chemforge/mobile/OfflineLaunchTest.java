@@ -82,6 +82,18 @@ public class OfflineLaunchTest {
             assertTrue("Tampering must reject record instead of returning empty history",rejected);
         } finally {file.delete();}
     }
+    @Test public void assertModelSelfTestDoesNotChangeLearningHistory() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            WebView web=webView(scenario);
+            eventuallyTrue(web,"!!(window.ChemModelDiagnostics && document.querySelector('#model-benchmark'))");
+            final String before=js(web,"document.querySelector('#stat-attempts').textContent");
+            assertEquals("true", js(web,"(document.querySelector('#model-benchmark').click(),true)"));
+            eventuallyTrue(web,"document.querySelector('#model-diagnostics').textContent.length>0");
+            assertEquals("A model diagnostic must not change assessment evidence",before,
+                js(web,"document.querySelector('#stat-attempts').textContent"));
+        }
+    }
+
     @Test public void assertLearnNavigation() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             WebView web=webView(scenario);

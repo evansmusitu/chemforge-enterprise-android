@@ -4,6 +4,9 @@ import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import android.os.StatFs
+import android.os.Build
+import android.os.SystemClock
+import org.json.JSONObject
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
@@ -141,6 +144,62 @@ class OfflineModelHost(private val context: Context, private val listener: Liste
                 listener.event("answer", requestId, answer.take(24_000))
             } catch (err: Exception) {
                 listener.event("error", requestId, "Local model unavailable: ${err.message ?: "unknown error"}. Offline practice still works.")
+            }
+        }
+    }
+
+    /** QA-only offline CPU inference probe. Reports aggregate timings, never student text or marks. */
+    fun benchmark(requestId: String) {
+        if (closed) return
+        executor.execute {
+            try {
+                require(ManagedPolicy.read(context).localAi) { "Offline AI disabled by institution policy" }
+                require(model.isFile) { "No approved model installed" }
+                verifyInstalledModel()
+                val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                val before = ActivityManager.MemoryInfo()
+                manager.getMemoryInfo(before)
+                if (engine == null) {
+                    require(!before.lowMemory && before.availMem >= MIN_AVAILABLE_BYTES) {
+                        "Insufficient available RAM for safe model startup"
+                    }
+                }
+                listener.event("progress", requestId, "Initialising local model using CPU; no network or student data…")
+                val initStart = SystemClock.elapsedRealtime()
+                if (engine == null) {
+                    val fresh = Engine(EngineConfig(modelPath=model.absolutePath, backend=Backend.CPU()))
+                    try { fresh.initialize(); engine=fresh }
+                    catch (err: Exception) { fresh.close(); throw err }
+                }
+                val loadMs = SystemClock.elapsedRealtime() - initStart
+                require(ManagedPolicy.read(context).localAi) { "Institution disabled AI during diagnostics" }
+                listener.event("progress", requestId, "Running offline inference and measuring response time…")
+                val inferStart = SystemClock.elapsedRealtime()
+                val answer = engine!!.createConversation(
+                    com.google.ai.edge.litertlm.ConversationConfig(maxOutputToken=32)
+                ).use { conversation ->
+                    conversation.sendMessage("Explain in one short sentence why atoms form chemical bonds.").toString()
+                }
+                val inferMs = SystemClock.elapsedRealtime() - inferStart
+                require(answer.isNotBlank()) { "Model returned an empty response" }
+                val after = ActivityManager.MemoryInfo()
+                manager.getMemoryInfo(after)
+                // No learner answers, prompts, student identifier or generated text enter this report.
+                val report = JSONObject()
+                    .put("kind", "local_inference_benchmark")
+                    .put("verified", true)
+                    .put("backend", "CPU")
+                    .put("model_sha256_prefix", approvedDigest.take(12))
+                    .put("model_bytes", model.length())
+                    .put("load_ms", loadMs)
+                    .put("inference_ms", inferMs)
+                    .put("response_chars", answer.length)
+                    .put("ram_available_before_mb", before.availMem / 1_000_000)
+                    .put("ram_available_after_mb", after.availMem / 1_000_000)
+                    .put("android_api", Build.VERSION.SDK_INT)
+                listener.event("benchmark", requestId, report.toString())
+            } catch (err: Exception) {
+                listener.event("error", requestId, "Self-test failed: ${err.message ?: "unavailable"}. Offline lessons remain available.")
             }
         }
     }

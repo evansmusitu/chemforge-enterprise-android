@@ -44,7 +44,7 @@ public final class MainActivity extends Activity {
     private static final int IMPORT_PACK = 704;
     private static final int MAX_BACKUP_BYTES = 2_000_000;
     private static final Set<String> ASSETS = Collections.unmodifiableSet(
-        new HashSet<>(Arrays.asList("index.html", "styles.css", "data.js", "engine.js", "coach.js", "lessons.js", "mock.js", "app.js", "enterprise_pack.js", "enterprise_policy.js")));
+        new HashSet<>(Arrays.asList("index.html", "styles.css", "data.js", "engine.js", "coach.js", "model_diagnostics.js", "lessons.js", "mock.js", "app.js", "enterprise_pack.js", "enterprise_policy.js")));
 
     private WebView view;
     private String pendingExport;
@@ -215,6 +215,14 @@ public final class MainActivity extends Activity {
             modelHost.status();
         }
         @JavascriptInterface public void unloadModel() { modelHost.release(); }
+        @JavascriptInterface public void benchmarkModel(String requestId) {
+            ManagedPolicy current=ManagedPolicy.read(MainActivity.this);
+            if(!current.localAi){sendModelEvent("error", requestId==null?"":requestId, "Offline AI disabled by institution policy.");return;}
+            if(requestId==null || requestId.length()>50 || !requestId.matches("bench-[0-9]+")){
+                sendModelEvent("error", "", "Invalid model diagnostic request.");return;
+            }
+            modelHost.benchmark(requestId);
+        }
         @JavascriptInterface public void askModel(String requestId, String prompt) {
             if (!policy.localAi) {sendModelEvent("error", requestId==null?"":requestId, "AI disabled by institution policy.");return;}
             if (requestId == null || requestId.length() > 50 || prompt == null || prompt.length() > 11000) {
