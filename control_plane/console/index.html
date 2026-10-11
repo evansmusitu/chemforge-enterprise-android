@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>CHEMFORGE Control | Institutional Console</title>
+  <meta name="description" content="CHEMFORGE Control institutional administration console (pilot)">
+  <link rel="stylesheet" href="/console/style.css">
+  <script src="/console/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Console navigation">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">⬡</span><span><strong>CHEMFORGE</strong><small>CONTROL <span class="tag">ALPHA</span></small></span></div>
+      <div class="sidebar-rule"></div>
+      <div class="sidebar-caption">WORKSPACE</div>
+      <nav id="navigation" aria-label="Main navigation" hidden></nav>
+      <div class="side-foot"><div class="connection-dot"></div><span>Offline-first learning<br><small>Connected administration</small></span></div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div><span class="eyebrow">INSTITUTIONAL OPERATIONS</span><h1 id="page-title">Institutional console</h1></div>
+        <div class="user-actions"><span id="identity" class="identity" hidden></span><button id="logout" class="btn btn-ghost" type="button" hidden>Sign out</button></div>
+      </header>
+      <div id="messages" role="status" aria-live="polite"></div>
+      <section id="login" class="login-wrap" aria-labelledby="login-heading">
+        <div class="login-panel">
+          <span class="eyebrow teal">SECURE ACCESS</span><h2 id="login-heading">Connect your institution</h2>
+          <p class="subtext">Enter the one-time-issued administrator or teacher credential for your institution. Credentials are kept in memory for this tab only.</p>
+          <form id="login-form"><label for="credential">Institution bearer credential</label><input id="credential" type="password" required autocomplete="off" spellcheck="false" placeholder="cfcp_••••••••••••••••" aria-describedby="credential-hint"><div id="credential-hint" class="field-help">Never share this token in a screenshot, URL, or support ticket.</div><button type="submit" class="btn btn-primary wide">Open console <span aria-hidden="true">→</span></button></form>
+          <p class="security-note"><span aria-hidden="true">●</span> For authorised pilot institutions only. Use HTTPS outside localhost; this is not a production SSO solution.</p>
+        </div>
+        <div class="login-graphic" aria-hidden="true"><span class="orbit orbit-one"></span><span class="orbit orbit-two"></span><span class="orbital-center">Cf</span><span class="molecule one"></span><span class="molecule two"></span><span class="molecule three"></span><div class="graphic-caption">ONE PLATFORM<br>EVERY LEARNER</div></div>
+      </section>
+      <section id="workspace" hidden aria-label="Administration workspace"><div id="content"></div></section>
+      <footer class="footer">CHEMFORGE Enterprise <span>·</span> Control v1.6 pilot <span>·</span> Imported results are never certified exam marks</footer>
+    </main>
+  </div>
+</body>
+</html>

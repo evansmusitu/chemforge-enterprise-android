@@ -47,3 +47,19 @@ Read [docs/RELEASE_v1.4.md](docs/RELEASE_v1.4.md) and [docs/VERIFICATION_v1.4.md
 `control_plane/` now contains **CHEMFORGE Control**, a separate local/hosted FastAPI and SQLite service for institutional provisioning, teacher access, pseudonymous rosters, assignments, version registry metadata, audit logs and explicit import of Android JSON learning backups. It has its own testing workflow, `.github/workflows/control-plane-tests.yml`. Imported study evidence is always unverified; this control service does **not** grant high-stakes grades or provide automatic mobile/cloud sync.
 
 See [control_plane/README.md](control_plane/README.md), [docs/RELEASE_v1.5.md](docs/RELEASE_v1.5.md), and [docs/VERIFICATION_v1.5.md](docs/VERIFICATION_v1.5.md). The Android APK remains the v1.4 debug release; **no new Android APK was built for the separate administration service**.
+
+
+## CHEMFORGE Control institutional dashboard (v1.6)
+
+The control-plane server now serves a self-contained school console at `http://127.0.0.1:8020/console` with in-memory credentials, admin/teacher role awareness, pseudonymous student registration, cohorts and counts, teacher issuance/revocation, assignments, explicit offline learning-backup import, curriculum metadata registration and audit views. Browser imports **never** certify study evidence. The Android v1.4 APK is unchanged.
+
+**Local quickstart:**
+
+```bash
+python -m pip install -r control_plane/requirements.txt
+python -m control_plane.cli bootstrap --db ./control.sqlite --tenant school-demo --admin-label "Admin"
+CHEMFORGE_CONTROL_DB=./control.sqlite uvicorn control_plane.app:create_app --factory --host 127.0.0.1 --port 8020
+# open http://127.0.0.1:8020/console
+```
+
+See [docs/RELEASE_v1.6.md](docs/RELEASE_v1.6.md) and [control_plane/README.md](control_plane/README.md). **Do not expose this pilot to the public internet or use it for real minors' records without production identity, consent/legal-basis, security and privacy work.**

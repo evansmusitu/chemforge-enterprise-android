@@ -4,6 +4,7 @@ A distinct connected teacher/admin service; the Android app still has no
 INTERNET permission. No endpoint certifies imported assessment marks.
 """
 
+from pathlib import Path
 from datetime import datetime
 from hashlib import sha256
 from typing import Annotated, Literal
@@ -14,6 +15,7 @@ import re
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
+from fastapi.responses import FileResponse
 
 from .db import Database, new_token, token_digest, utcnow
 
@@ -130,8 +132,36 @@ class ReleaseIn(StrictModel):
 
 def create_app(db_path: str | None = None) -> FastAPI:
     db = Database(db_path or os.environ.get('CHEMFORGE_CONTROL_DB','control.sqlite'))
-    app = FastAPI(title='CHEMFORGE Control',version='0.1.0',
+    app = FastAPI(title='CHEMFORGE Control',version='0.2.0',
                   description='Tenant-isolated administrative pilot; imported marks are unverified.')
+
+    console_dir = Path(__file__).resolve().parent / 'console'
+    no_store = {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+                'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer'}
+    console_csp = ("default-src 'none'; script-src 'self'; "
+                   "style-src 'self'; connect-src 'self'; img-src 'self'; "
+                   "base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'")
+
+    @app.middleware('http')
+    async def private_responses(request, call_next):
+        response = await call_next(request)
+        for header, value in no_store.items():
+            response.headers[header] = value
+        if request.url.path.startswith('/console'):
+            response.headers['Content-Security-Policy'] = console_csp
+        return response
+
+    @app.get('/console', include_in_schema=False)
+    def console():
+        return FileResponse(console_dir / 'index.html', media_type='text/html')
+
+    @app.get('/console/app.js', include_in_schema=False)
+    def console_script():
+        return FileResponse(console_dir / 'app.js', media_type='application/javascript')
+
+    @app.get('/console/style.css', include_in_schema=False)
+    def console_styles():
+        return FileResponse(console_dir / 'style.css', media_type='text/css')
 
     def actor(authorization: Annotated[str | None, Header()] = None):
         if not authorization or not authorization.startswith('Bearer '):
