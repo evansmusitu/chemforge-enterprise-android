@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<restrictions xmlns:android="http://schemas.android.com/apk/res/android">
+    <restriction android:key="tenant_id" android:title="Institution identifier" android:description="Restrict signed offline content and student backups to this organisation identifier." android:restrictionType="string" android:defaultValue="" />
+    <restriction android:key="enable_local_ai" android:title="Enable on-device AI" android:description="Allow importing and running a local AI model; AI never assigns student marks." android:restrictionType="bool" android:defaultValue="true" />
+    <restriction android:key="allow_data_export" android:title="Allow learning record export" android:description="Allow students to export their own study backups using the Android document picker." android:restrictionType="bool" android:defaultValue="true" />
+    <restriction android:key="allow_content_import" android:title="Allow signed curriculum imports" android:description="Allow offline imports of packages signed by the institution's pinned content key." android:restrictionType="bool" android:defaultValue="true" />
+    <restriction android:key="allow_data_import" android:title="Allow study backup import" android:description="Allow students to import historical study records. Imported records are unverified and cannot boost mastery." android:restrictionType="bool" android:defaultValue="false" />
+</restrictions>

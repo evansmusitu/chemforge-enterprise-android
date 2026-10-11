@@ -1,0 +1,14 @@
+.gradle/
+.idea/
+local.properties
+**/build/
+*.iml
+*.keystore
+*.jks
+.DS_Store
+
+# Never commit institutional private signing credentials or generated packs.
+*private*.pem
+*private*.key
+*.cfpack
+*.litertlm

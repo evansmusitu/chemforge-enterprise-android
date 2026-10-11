@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+<meta name="theme-color" content="#09151b" />
+<title>CHEMFORGE • Offline Chemistry</title>
+<link rel="stylesheet" href="styles.css" />
+<script defer src="data.js"></script>
+<script defer src="enterprise_pack.js"></script>
+<script defer src="enterprise_policy.js"></script>
+<script defer src="engine.js"></script>
+<script defer src="coach.js"></script>
+<script defer src="lessons.js"></script>
+<script defer src="mock.js"></script>
+<script defer src="app.js"></script>
+</head>
+<body>
+<div class="app">
+  <header class="top"><div class="logo"><div class="symbol">⌬</div><div><b>CHEM<span>FORGE</span></b><small>ADVANCED CHEMISTRY • ZIMBABWE</small></div></div><div class="offline"><i></i> OFFLINE</div></header>
+  <main id="main">
+  <section id="screen-home" class="screen active">
+    <div class="eyebrow">LEARNING INTELLIGENCE / ENTERPRISE 1.3-alpha</div>
+    <div class="hero"><span class="hero-kicker">YOUR CHEMISTRY, DECODED.</span><h1>Think deeper.<br/><em>Score smarter.</em></h1><p>Practise, diagnose and retain essential A-Level chemistry skills — even without internet.</p><button id="start-study" class="button primary">Start adaptive practice <span>→</span></button></div>
+    <div class="card" id="institution-card"><span class="badge">OFFLINE INSTITUTIONAL CONTENT</span><h3>Enterprise deployment</h3>
+      <p id="institution-status" class="minor">Pilot content installed. No institutional curriculum pack active.</p>
+      <button type="button" id="pack-import" class="button secondary full">Import signed institution pack ↧</button>
+      <p class="minor">Packages require a trusted institutional signing key configured when the app is built. A valid signature does not establish scientific expert review.</p>
+    </div>
+    <div class="card model-card" id="model-card">
+      <div class="model-head"><span class="badge">MEMORY-GATED LOCAL AI</span><b>Offline Chemistry Coach</b></div>
+      <p>Optionally import a <code>.litertlm</code> model from your phone. Your questions stay on-device. Normal practice works without a model.</p>
+      <p class="minor">Institutions choose and approve a compatible LiteRT-LM model for their hardware fleet. AI must match the SHA-256 digest approved in the build; it is optional and never needed for offline revision.</p>
+      <p id="model-status" class="minor" aria-live="polite">Checking model availability…</p>
+      <button type="button" id="model-import" class="button secondary full">Import on-device model ↥</button>
+      <button type="button" id="model-unload" class="button secondary full">Unload AI to free phone memory ⏻</button>
+      <p class="minor">Model not bundled. Transfer your institution-approved .litertlm file, then import locally. Integrity and memory headroom are checked before loading. AI explanations are unverified and never used to award marks.</p>
+    </div>
+    <div class="notice"><span>✳</span><div><b>Research pilot, not an official ZIMSEC app.</b><p>Default pilot: 44 unreviewed original questions and 28 provisional topic mappings. Institution-provided packs may differ; no grade predictions.</p></div></div>
+    <div class="sect-heading"><h2>Learning signal</h2><small>Based on locally saved attempts</small></div>
+    <div class="stats"><div class="stat"><span>ATTEMPTS</span><b id="stat-attempts">0</b></div><div class="stat"><span>OBJECTIVES</span><b id="stat-assessed">0<small>/28</small></b></div><div class="stat"><span>ACCURACY</span><b id="stat-accuracy">—</b></div><div class="stat"><span>REVIEWS DUE</span><b id="stat-due">0</b></div></div>
+    <div class="sect-heading"><h2>Competency coverage</h2><small>Topic-level pilot</small></div>
+    <div class="card" id="domain-bars"></div>
+    <button id="review-next" class="button secondary full">Continue from your weak spots <span>↗</span></button>
+  </section>
+  <section id="screen-learn" class="screen">
+    <div class="eyebrow">02 / OFFLINE CONCEPT LIBRARY</div><h1 class="page-title">Learn <em>the why.</em></h1>
+    <p class="lead">Original editorial micro-lessons for the unreviewed pilot. Institution-provided lessons override them when available. Not a replacement for an authenticated syllabus or expert-reviewed textbook.</p>
+    <div class="filters"><label>DISCIPLINE<select id="learn-domain"><option value="All">All disciplines</option><option>Physical</option><option>Inorganic</option><option>Organic</option><option>Applied</option><option>Practical</option></select></label><div><span class="badge" id="lesson-count">0 lessons</span></div></div>
+    <div id="lesson-list" aria-live="polite"></div>
+  </section>
+  <section id="screen-practice" class="screen">
+    <div class="eyebrow">03 / ADAPTIVE ASSESSMENT</div><h1 class="page-title">Practice <em>lab.</em></h1><p class="lead">Every response becomes evidence. Core practice works without AI.</p>
+    <div class="mode-control" id="modes"><button data-mode="diagnostic" class="active" type="button">Diagnose</button><button data-mode="practice" type="button">Practise</button><button data-mode="exam" type="button">Exam drill</button></div>
+    <div class="filters"><label>DISCIPLINE<select id="filter-domain"><option value="All">All subjects</option><option>Physical</option><option>Inorganic</option><option>Organic</option><option>Applied</option><option>Practical</option></select></label><label>PAPER<select id="filter-paper"><option value="All">All papers</option><option value="P1">Paper 1</option><option value="P2">Paper 2</option><option value="P3">Paper 3</option><option value="P4">Paper 4</option></select></label></div>
+    <article class="question card" id="question-area" aria-live="polite"></article>
+    <section id="feedback" class="card feedback hidden" aria-live="polite"></section>
+    <section class="card coach-panel hidden" id="coach-panel" aria-label="Optional offline AI explanation">
+      <span class="badge">OPTIONAL • ON-DEVICE AI</span>
+      <h3>Ask the Chemistry Coach</h3>
+      <p class="minor">Only available after your independent submission. The model offers unverified explanations, not examination marks.</p>
+      <textarea id="coach-request" class="input-answer" maxlength="600" placeholder="Explain why my answer was wrong, step by step…"></textarea>
+      <button type="button" id="coach-ask" class="button secondary full">Generate an offline explanation →</button>
+      <div class="coach-output" id="coach-output" role="status" aria-live="polite"></div>
+    </section>
+    <button id="next-question" class="button secondary full">Next question <span>→</span></button>
+  </section>
+  <section id="screen-mock" class="screen">
+    <div class="eyebrow">04 / TIMED OFFLINE PRACTICE</div><h1 class="page-title">Mock <em>studio.</em></h1>
+    <p class="lead">Original, unreviewed sample questions. This is a timed study drill, not an official ZIMSEC examination or a secure school assessment.</p>
+    <div class="card" id="mock-setup">
+      <div class="filters"><label>QUESTION TYPE<select id="mock-paper"><option value="P1">Paper 1</option><option value="P2">Paper 2</option><option value="P3">Paper 3</option><option value="P4">Paper 4</option></select></label><label>TIME LIMIT<select id="mock-minutes"><option value="5">5 minutes</option><option value="10" selected>10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></label></div>
+      <p class="minor">Up to five questions selected from the installed content. No hints or answers are shown until you finish. Written responses require separate review and are not automatically marked.</p>
+      <button id="mock-start" type="button" class="button primary full">Start timed drill →</button>
+    </div>
+    <div id="mock-running" class="hidden"><div class="mock-progress"><span id="mock-count"></span><span id="mock-timer" role="timer">10:00</span></div><article id="mock-question" class="card question"></article><button id="mock-next" type="button" class="button primary full">Save answer & next →</button><button id="mock-finish" type="button" class="button secondary full">Finish and review answers</button></div>
+    <section id="mock-results" class="hidden" aria-live="polite"></section>
+  </section>
+  <section id="screen-map" class="screen"><div class="eyebrow">05 / CURRICULUM INTELLIGENCE</div><h1 class="page-title">Skill <em>map.</em></h1><p class="lead">Pilot topic-level competencies with prerequisite links. M0–M4 are unvalidated heuristic classifications.</p><div class="map-legend">◌ Unassessed &nbsp; · &nbsp; ● Developing &nbsp; · &nbsp; ✦ Stronger evidence</div><div id="skill-list"></div></section>
+  <section id="screen-journal" class="screen"><div class="eyebrow">06 / YOUR EVIDENCE</div><h1 class="page-title">Learning <em>ledger.</em></h1><p class="lead">Your practice record is saved on this device, not uploaded to a server.</p>
+    <div class="card storage-card"><h3>My data</h3><p>No account, network access, analytics or cloud sync. Back up your work before uninstalling or clearing app storage.</p><button id="export" class="button primary full">Export JSON backup ↥</button><button id="import" class="button secondary full">Import JSON backup ↧</button><button id="clear-history" class="button destructive full">Clear local history</button><p id="storage-message" class="minor"></p></div>
+    <div class="sect-heading"><h2>Recent attempts</h2><small id="journal-count">0 records</small></div><div class="card" id="history-list"></div>
+    <div class="integrity"><b>Scientific and assessment limits</b><p>The bundled pilot contains original unreviewed questions, not officially authenticated ZIMSEC materials. Institutional packs require independent scientific review. Multiple choice and numeric answers are machine-marked. Written work is self-reviewed and counted as weaker evidence. Review dates are heuristic estimates.</p><p>Offline answers reside inside the APK. This is not a secure high-stakes examination system and does not include the desktop research-review workbench or local Ollama service.</p></div>
+  </section>
+  </main>
+  <nav class="bottom-nav" aria-label="Main navigation"><button data-screen="home" class="active"><span>⌂</span>Home</button><button data-screen="learn"><span>◈</span>Learn</button><button data-screen="practice"><span>⌬</span>Practice</button><button data-screen="mock"><span>◴</span>Mock</button><button data-screen="map"><span>◇</span>Skills</button><button data-screen="journal"><span>▤</span>Journal</button></nav>
+</div>
+</body>
+</html>
