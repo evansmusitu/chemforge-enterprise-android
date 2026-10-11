@@ -1,5 +1,11 @@
 name: Android Emulator Offline Functional Gate
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'app/**'
+      - 'scripts/**'
+      - '.github/workflows/android-emulator-smoke.yml'
 permissions:
   contents: read
 jobs:
