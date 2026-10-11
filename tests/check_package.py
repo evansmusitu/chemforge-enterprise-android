@@ -60,7 +60,9 @@ cipher=(BASE/'app/src/main/java/ai/chemforge/mobile/RecordCipher.java').read_tex
 record=(BASE/'app/src/main/java/ai/chemforge/mobile/AndroidRecordStore.java').read_text()
 ui=(assets/'app.js').read_text()
 engine=(assets/'engine.js').read_text()
-assert 'AES/GCM/NoPadding' in cipher and 'updateAAD' in cipher and 'SecureRandom' in cipher
+assert 'AES/GCM/NoPadding' in cipher and 'updateAAD' in cipher
+assert 'cipher.init(Cipher.ENCRYPT_MODE,key);' in cipher and 'cipher.getIV()' in cipher
+assert 'RANDOM.nextBytes(iv)' not in cipher and 'cipher.init(Cipher.ENCRYPT_MODE,key,new GCMParameterSpec' not in cipher
 assert 'AndroidKeyStore' in record and 'AES' in record and 'ATOMIC_MOVE' in record
 assert 'loadRecords' in source and 'saveRecords' in source
 assert 'nativeRecordStore' in ui and 'if(storageLocked)' in ui
