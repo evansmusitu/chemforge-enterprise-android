@@ -65,7 +65,9 @@ jobs:
           python tests/browser_smoke.py
           python tests/secure_storage_smoke.py
       - name: Install Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
       - name: Install Android API 35
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Install Gradle 8.9
