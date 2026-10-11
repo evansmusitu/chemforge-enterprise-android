@@ -12,3 +12,13 @@ local.properties
 *private*.key
 *.cfpack
 *.litertlm
+
+# CHEMFORGE Control: never commit operational records or credentials
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+.env
+.env.*
+__pycache__/
+.pytest_cache/

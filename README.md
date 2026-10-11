@@ -41,3 +41,9 @@ Build with `CHEMFORGE_REQUIRE_PROVISIONING=true` and an authorised `CHEMFORGE_PA
 ## Validation and limitations
 
 Read [docs/RELEASE_v1.4.md](docs/RELEASE_v1.4.md) and [docs/VERIFICATION_v1.4.md](docs/VERIFICATION_v1.4.md). This release does not include a cloud administration server, verified complete curriculum, production signing, or device performance measurements from an actual running model. See `docs/ON_DEVICE_AI_DIAGNOSTICS_v1.4.md`.
+
+## Enterprise administration pilot (v1.5)
+
+`control_plane/` now contains **CHEMFORGE Control**, a separate local/hosted FastAPI and SQLite service for institutional provisioning, teacher access, pseudonymous rosters, assignments, version registry metadata, audit logs and explicit import of Android JSON learning backups. It has its own testing workflow, `.github/workflows/control-plane-tests.yml`. Imported study evidence is always unverified; this control service does **not** grant high-stakes grades or provide automatic mobile/cloud sync.
+
+See [control_plane/README.md](control_plane/README.md), [docs/RELEASE_v1.5.md](docs/RELEASE_v1.5.md), and [docs/VERIFICATION_v1.5.md](docs/VERIFICATION_v1.5.md). The Android APK remains the v1.4 debug release; **no new Android APK was built for the separate administration service**.
