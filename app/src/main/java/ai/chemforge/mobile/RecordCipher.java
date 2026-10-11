@@ -1,7 +1,6 @@
 package ai.chemforge.mobile;
 
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.util.Arrays;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -14,7 +13,6 @@ import javax.crypto.spec.GCMParameterSpec;
 public final class RecordCipher {
     private static final byte[] MAGIC = {'C','F','R','1'};
     private static final int NONCE_BYTES=12, TAG_BYTES=16, MAX_PLAINTEXT=2_000_000;
-    private static final SecureRandom RANDOM = new SecureRandom();
     private RecordCipher() { }
 
     private static byte[] aad(String scope) {
@@ -27,9 +25,13 @@ public final class RecordCipher {
         byte[] associated=aad(scope);
         if (key==null || plaintext==null || plaintext.length>MAX_PLAINTEXT)
             throw new IllegalArgumentException("invalid record plaintext");
-        byte[] iv=new byte[NONCE_BYTES];RANDOM.nextBytes(iv);
         Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE,key,new GCMParameterSpec(8*TAG_BYTES,iv));
+        // AndroidKeyStore AES-GCM keys with randomized encryption REQUIRE provider-created IVs.
+        // Do not supply a caller-generated nonce to init(ENCRYPT_MODE).
+        cipher.init(Cipher.ENCRYPT_MODE,key);
+        byte[] iv=cipher.getIV();
+        if(iv==null || iv.length!=NONCE_BYTES)
+            throw new SecurityException("AES-GCM provider returned an invalid IV");
         cipher.updateAAD(associated);
         byte[] ciphertext=cipher.doFinal(plaintext);
         byte[] result=new byte[MAGIC.length+iv.length+ciphertext.length];
