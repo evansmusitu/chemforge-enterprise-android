@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="restriction_tenant_id_title">Institution identifier</string>
+    <string name="restriction_tenant_id_description">Restrict signed offline content and student backups to this organisation identifier.</string>
+    <string name="restriction_enable_local_ai_title">Enable on-device AI</string>
+    <string name="restriction_enable_local_ai_description">Allow importing and running a local AI model; AI never assigns student marks.</string>
+    <string name="restriction_allow_data_export_title">Allow learning record export</string>
+    <string name="restriction_allow_data_export_description">Allow students to export their own study backups using the Android document picker.</string>
+    <string name="restriction_allow_content_import_title">Allow signed curriculum imports</string>
+    <string name="restriction_allow_content_import_description">Allow offline imports of packages signed by the institution\'s pinned content key.</string>
+    <string name="restriction_allow_data_import_title">Allow study backup import</string>
+    <string name="restriction_allow_data_import_description">Allow students to import historical study records. Imported records are unverified and cannot boost mastery.</string>
+</resources>
