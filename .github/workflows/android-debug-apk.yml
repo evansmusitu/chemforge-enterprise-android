@@ -13,7 +13,7 @@ on:
       - 'app/src/androidTest/**'
       - '.github/workflows/android-debug-apk.yml'
 permissions:
-  contents: read
+  contents: write
 jobs:
   build-debug-apk:
     runs-on: ubuntu-latest
@@ -74,6 +74,19 @@ jobs:
           gradle-version: '8.9'
       - name: Compile, lint, and verify offline Android APK
         run: bash scripts/build_debug_apk.sh
+      - name: Publish qualified debug APK as a prerelease
+        if: success()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="chemforge-debug-${GITHUB_RUN_NUMBER}"
+          gh release create "$tag" \
+            app/build/outputs/apk/debug/app-debug.apk \
+            app/build/outputs/apk/debug/apk-sha256.txt \
+            --prerelease \
+            --title "CHEMFORGE Android debug build ${GITHUB_RUN_NUMBER}" \
+            --notes "Automated offline debug APK. Not production-signed or device-qualified. Commit ${GITHUB_SHA}."
       - name: Archive debug APK and checksums
         uses: actions/upload-artifact@v4
         with:
@@ -83,3 +96,28 @@ jobs:
             app/build/outputs/apk/debug/apk-sha256.txt
           if-no-files-found: error
           retention-days: 14
+      - name: Record observable CI result
+        if: always()
+        continue-on-error: true
+        env:
+          CHECK_STATUS: ${{ job.status }}
+        run: |
+          mkdir -p ci
+          {
+            echo "# CHEMFORGE Android build status"
+            echo
+            echo "- Workflow run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- Job status at report time: ${CHECK_STATUS}"
+            if test -s app/build/outputs/apk/debug/app-debug.apk; then
+              echo "- APK: present; release artifact or Actions artifact may be available"
+            else
+              echo "- APK: absent"
+            fi
+            echo "- Recorded: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > ci/latest-build.md
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ci/latest-build.md
+          git commit -m 'ci: record android qualification run [skip ci]' || true
+          git push origin HEAD:"${GITHUB_REF_NAME}" || true
