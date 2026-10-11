@@ -255,7 +255,7 @@ public final class EnterprisePackManager {
     }
     /** Cached package is re-authenticated on each WebView load and filtered against current organisation. */
     String webViewContentScript(String tenant) {
-        if (!active.isFile || active.length()>MAX_ZIP_BYTES) return "window.CF_PACK_INFO=null;";
+        if (!active.isFile() || active.length()>MAX_ZIP_BYTES) return "window.CF_PACK_INFO=null;";
         try {
             Pack pack = parseVerified(Files.readAllBytes(active.toPath()),tenant);
             String org = pack.manifest.getString("tenant_id");
