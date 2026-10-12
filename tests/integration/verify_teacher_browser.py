@@ -34,6 +34,7 @@ def verify_teacher_browser(root: Path, base: str, screenshot: Path | None = None
             overview = page.locator('#cohort-overview').text_content()
             assert 'U6-A' in overview and 'U6-B' not in overview, overview
             assert 'unverified attempts' in overview.lower(), overview
+            assert 'authorised devices or teachers' in page.locator('#view-overview').text_content().lower()
             assert page.locator('button[data-view=teachers]').is_hidden(), 'Teacher saw admin controls'
             assert page.locator('button[data-view=devices]').is_hidden(), 'Teacher saw device secrets panel'
             page.locator('button[data-view=students]').click()
