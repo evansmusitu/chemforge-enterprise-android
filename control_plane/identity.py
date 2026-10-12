@@ -71,7 +71,9 @@ class OIDCConfiguration:
         try:
             header=jwt.get_unverified_header(token)
             kid=header.get('kid')
-            if (header.get('alg') != 'RS256' or header.get('typ', '').lower() not in ('at+jwt','application/at+jwt')
+            typ=header.get('typ')
+            if (header.get('alg') != 'RS256' or not isinstance(typ,str)
+                    or typ.lower() not in ('at+jwt','application/at+jwt')
                     or not isinstance(kid,str)
                     or kid not in self.keys or header.get('crit')):
                 raise StaffAuthenticationError('Invalid OIDC access token')

@@ -32,13 +32,13 @@ def _fixture(tmp_path, monkeypatch):
         db.link_oidc_subject(row['tenant_id'],row['id'],ISSUER,'identity-'+row['tenant_id'])
     return db, key, legacy_a, legacy_b
 
-def _token(key, *, sub='identity-school-a', aud=AUDIENCE, iss=ISSUER, amr=None, expires=15, extra=None, signing_key=None):
+def _token(key, *, sub='identity-school-a', aud=AUDIENCE, iss=ISSUER, amr=None, expires=15, extra=None, signing_key=None, header_typ="at+jwt"):
     now = datetime.now(timezone.utc)
     payload={'iss':iss,'aud':aud,'sub':sub,'iat':now,'nbf':now-timedelta(seconds=1),
              'exp':now+timedelta(minutes=expires),'amr':amr if amr is not None else ['pwd','mfa'],
              'client_id':'chemforge-staff-dashboard','jti':'unit-test-'+str(now.timestamp())}
     payload.update(extra or {})
-    return jwt.encode(payload, signing_key or key, algorithm='RS256', headers={'kid':'2026-test-rsa-key','typ':'at+jwt'})
+    return jwt.encode(payload, signing_key or key, algorithm='RS256', headers={'kid':'2026-test-rsa-key','typ':header_typ})
 
 def _auth(token): return {'Authorization':'Bearer '+token}
 
@@ -69,6 +69,7 @@ def test_oidc_requires_valid_provider_token_mfa_and_mapped_actor(tmp_path,monkey
                         algorithm='RS256',headers={'kid':'2026-test-rsa-key','typ':'JWT'}),
             _token(key,extra={'client_id':None}),
             _token(key,extra={'jti':None}),
+            _token(key,header_typ=['at+jwt']),
         ]
         for bad in cases:
             response=client.get('/v1/me',headers=_auth(bad))

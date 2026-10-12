@@ -9,7 +9,7 @@ Date: 12 October 2026. Source-only control-plane change: Android binary and emul
 - `python tests/check_package.py`: static Android/offline/source gates **passed** (exit 0).
 - `python tests/control_plane/dashboard_browser_smoke.py`: Chromium DOM with real in-process FastAPI handlers **passed** (exit 0). This browser smoke does not traverse a network socket, and secure-origin policy is bypassed inside the test harness only.
 
-Focused regression cycles observed failing before implementation: missing `Database.link_oidc_subject`; OIDC configuration accepted with missing settings; multi-audience token accepted; missing operator `link-oidc` command; dashboard max length 120; RFC9068-invalid token type accepted; OIDC-mode teacher creation exposed obsolete pilot tokens. After implementing the requirements the same focused tests passed.
+Focused regression cycles observed failing before implementation: missing `Database.link_oidc_subject`; OIDC configuration accepted with missing settings; multi-audience token accepted; missing operator `link-oidc` command; dashboard max length 120; RFC9068-invalid token type accepted; OIDC-mode teacher creation exposed obsolete pilot tokens. After implementing the requirements the same focused tests passed. A malformed JWT `typ` header containing a JSON array was also observed causing an unhandled `AttributeError` (red), and now produces an authentication rejection (green).
 
 ## Supported identity rules
 
