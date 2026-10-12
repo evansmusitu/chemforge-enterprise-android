@@ -17,3 +17,9 @@ Dashboard-focused test initially failed (`3 failed`) because `/control/`, `/cont
 ## Not verified
 
 Production deployment, real HTTPS reverse proxy, SSO/MFA, mobile screen readers, student-data privacy compliance, third-party security audit, full browser network E2E, or educational validity. Existing Android APK is not rebuilt by server-only changes.
+
+## GitHub CI verification — October 12, 2026
+
+- Control-plane tests, workflow run `38223463807`, commit `9759f936…`: **success**.
+- Android source/build/lint pipeline, workflow run `38223464094`, commit `9759f936…`: **success**. This compiles the existing v1.4 Android client; the v1.6 dashboard itself is **server-side**, not an APK upgrade.
+- URLs: `https://github.com/evansmusitu/chemforge-enterprise-android/actions/runs/38223463807` and `https://github.com/evansmusitu/chemforge-enterprise-android/actions/runs/38223464094`.
