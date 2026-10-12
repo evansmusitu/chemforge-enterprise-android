@@ -9,4 +9,6 @@
 
 ## Android CI
 
-Not yet recorded. Consult `.github/workflows/staging-e2e-https.yml` after GitHub execution. *A green Python test is not proof of Android-to-server integration.*
+- Initial Android integration CI workflow **PASS**, run `38249700843`, commit `ceee19c365f51927095b430ee773f3c7e60871f9`: connected Android compilation, emulator native HTTP upload, TLS-negative test, HTTP 201+200 and 401+422, teacher API proof, 6 Android instrumentation tests.
+- A follow-up workflow adds a **true HTTPS Chromium teacher dashboard check**; pending independent CI verification. The local container blocks Chromium navigation to localhost (`ERR_BLOCKED_BY_ADMINISTRATOR`), so it was not possible to qualify that browser network test locally. It is not counted as passed until GitHub CI confirms it.
+- The staging server is temporary and runner-local, **not** a permanent hosted endpoint.

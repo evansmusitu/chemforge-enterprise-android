@@ -33,3 +33,5 @@ This is a **CI-hosted, disposable staging run**, not a permanently deployed publ
 
 Run host-only HTTPS proof locally: `python -m tests.integration.staging_https demo --dir /tmp/chemforge-v19-demo`.
 See `docs/RELEASE_v1.9.md` and `docs/VERIFICATION_v1.9.md`.
+
+The v1.9 gate additionally attempts a real HTTPS Chromium dashboard login using the synthetic teacher token and a private test certificate; the local ChatGPT browser sandbox denies localhost navigation, so its result must be read from GitHub Actions.
