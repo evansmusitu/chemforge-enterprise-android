@@ -21,6 +21,7 @@ def test_dashboard_is_locally_served_with_browser_isolation_headers(tmp_path):
             assert "connect-src 'self'" in r.headers['content-security-policy']
             assert "frame-ancestors 'none'" in r.headers['content-security-policy']
             assert 'unsafe-inline' not in r.headers['content-security-policy']
+        assert client.get('/control/unknown-resource').status_code == 404
 
 
 def test_dashboard_exposes_workflows_but_no_secret_persistence(tmp_path):
