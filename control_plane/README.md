@@ -1,19 +1,18 @@
-# CHEMFORGE Control — Enterprise administration pilot (v1.6)
+# CHEMFORGE Control — Enterprise administration pilot (v1.5)
 
 A separate **server-side** administration component for managed schools. **The CHEMFORGE Student Android APK retains its offline-only architecture and does not need a network connection.** This component is not linked to Android for automatic synchronisation; explicit JSON-export import provides a manual bridge.
 
-## NEW: Local browser dashboard (v1.6)
+## Browser administration — v1.6
 
-After bootstrapping a tenant and starting the server, open **http://127.0.0.1:8020/console**.
+Start the same server as described below and open **`http://127.0.0.1:8020/control/`**. Enter the institution-issued administrator or teacher credential. The responsive, self-hosted browser interface supports overview metrics, students, assignments, manual backup import, curriculum release metadata, and (administrator only) teacher credentials and audit logs.
 
-The same-origin, dependency-free dashboard supports pseudonymous rosters, assignment creation, curriculum metadata, school activity summaries, authorised teacher credential issuance/revocation, administrator audit, secure record deletion, and **manual import** of Android JSON backups. Access to Teachers and Audit views is hidden for teacher credentials, but **the API enforces authorisation independently of the UI**.
+- All browser assets are **served from the same FastAPI origin**; there are no third-party CDNs, trackers or external CSS libraries.
+- Credentials are held in **volatile tab memory** only; do not use shared/public computers. Log out and close the browser when finished.
+- Browser navigation never bypasses server-enforced roles or tenant isolation. Teacher access is **still institution-wide** in this pilot; per-class teacher scopes are not yet implemented.
+- Importing a CHEMFORGE Android backup **does not verify authenticity** or certify marks. The interface shows unverified attempt counts, not educational outcomes.
+- The UI rejects credential transmission on non-HTTPS origins (except localhost loopback). For non-local pilots, put the service behind a securely configured HTTPS reverse proxy and obtain a privacy/security review **before handling real student data**.
 
-- The bearer credential is held in the current JavaScript runtime only, **not** localStorage, cookies, sessionStorage or URLs. Closing/reloading signs out. Production SSO is not implemented.
-- Server response headers use `Cache-Control: no-store`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`; `/console` assets receive a restricted `Content-Security-Policy`. No external fonts, scripts or calls.
-- The UI renders API-provided student, teacher and content strings as text nodes rather than HTML. The local browser test checks an HTML-injection payload stays inert.
-- The browser blocks entering bearer credentials over unencrypted **remote** HTTP. Run on localhost for development; use a correctly configured trusted HTTPS reverse proxy for any managed pilot.
-- The interface limits imported JSON backup files to 1 MB, while the backend separately validates records, tenant IDs, fingerprint envelopes and duplicate event IDs. **All imported marks remain unverified.**
-- No auto-sync or live Android connectivity is introduced. This remains a single-instance SQLite institutional pilot.
+The new HTML, JS and CSS are in `control_plane/dashboard/`. HTTP security headers include a restrictive CSP, `no-store`, `nosniff`, `X-Frame-Options: DENY` and a no-referrer policy. This is an interim defence, not an independent security audit.
 
 ## Delivered
 
@@ -35,7 +34,7 @@ CHEMFORGE_CONTROL_DB=./chemforge-control.sqlite uvicorn control_plane.app:create
 python -m pytest -q tests/control_plane
 ```
 
-The bootstrap command displays the bearer credential once; transfer it securely, **never commit it, log it, or paste it into an unsecured channel**. The service has a bearer-token browser console but no user-password login, MFA, password recovery, password reset, SSO, consent workflow, rate limiting, retention scheduler, distributed deployment or production audit review. It is a **pilot API**, not an enterprise production identity system.
+The bootstrap command displays the bearer credential once; transfer it securely, **never commit it, log it, or paste it into an unsecured channel**. The service has no interactive login, MFA, password recovery, password reset, SSO, CORS-accessible SPA, consent workflow, rate limiting, retention scheduler, distributed deployment or production audit review. It is a **pilot API**, not an enterprise production identity system.
 
 ### Example request
 
@@ -53,14 +52,3 @@ To import a student's offline CHEMFORGE record: export JSON using the Android ap
 **For a private, trusted pilot only.** Before real schools: implement SSO/OIDC and MFA, per-teacher class-level authorisation, TLS and trusted reverse proxy, audit integrity, encrypted server backups, periodic token expiration/rotation, administration safeguards, retention, consent/legal-basis validation, child-data protection, rate limiting, API pagination, threat modelling, and independent security audit. SQLite is single-node storage, not a scalable institutional database. The public HTTP API must not be exposed to the open internet as-is.
 
 Android never uploads automatically in this version. The server stores no AI-generated explanations or students' free-form answer text. The student-facing app's question bank is still provisional and not a complete expert-approved ZIMSEC syllabus.
-
-### Dashboard verification
-
-```bash
-python -m pytest -q tests/control_plane
-node --check control_plane/console/app.js
-# Optional on a trusted local workstation with playwright and Chromium installed:
-PYTHONPATH=. python tests/control_plane/browser_smoke.py
-```
-
-The Playwright smoke uses a **mock HTTP transport connected to the real FastAPI TestClient**, because the sandbox browser forbids all navigations; it does not establish real HTTPS deployment behaviour. Source/API tests assert the actual HTTPS-only remote-credential guard and CSP headers.

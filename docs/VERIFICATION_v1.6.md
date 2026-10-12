@@ -1,10 +1,19 @@
-# CHEMFORGE Control v1.6 — Verification Record
+# CHEMFORGE v1.6 — Verification record
 
-Recorded in the development container on 2026-10-11.
+Source baseline: v1.5 control plane, v1.4 offline Android.
 
-- `python -m pytest -q tests/control_plane/test_dashboard.py`: **4 passed**; red cases observed for missing UI, insecure hidden content behaviour, and over-broad CSP before fixes.
-- `python -m pytest -q`: **38 passed, 7 subtests passed**.
-- `node --check control_plane/console/app.js`: exit **0**.
-- `PYTHONPATH=. python tests/control_plane/browser_smoke.py`: **PASS**. This test uses Playwright Chromium, real DOM events, and FastAPI TestClient API responses intercepted by an in-page fetch bridge because Chromium navigation is forbidden in the execution sandbox. The production HTTPS origin guard is conditionally disabled **in the harness only** and remains unchanged in shipped source. Test coverage includes login, roster, assignment, teacher issuance, text-only rendering of malicious input, role restrictions and logout.
+## TDD observed red / green
 
-Important: Successful source tests do not establish production deployment security, real TLS operation, browser/device compatibility or school readiness. Android v1.4 APK is unchanged in this release.
+Dashboard-focused test initially failed (`3 failed`) because `/control/`, `/control/app.js`, and `/control/styles.css` did not exist (HTTP 404). After adding routes and local UI assets, `python -m pytest -q tests/control_plane/test_dashboard.py` returned `3 passed`.
+
+## Local verification — October 12, 2026
+
+- `python -m pytest -q tests`: **37 passed, 7 subtests passed**.
+- `node --test tests/*.test.cjs`: **40 passed, 0 failed**.
+- `python -m compileall -q control_plane`: passed.
+- `node --check control_plane/dashboard/app.js`: passed.
+- `python tests/control_plane/dashboard_browser_smoke.py`: passed, using Chromium DOM + real FastAPI TestClient handlers with artificial test-only HTTPS guard bypass; tested admin login, roster, assignment, issuing and dismissing a teacher credential, backup import, unverified counters, teacher role hiding, and XSS-safe text rendering. 390-pixel layout had no page-level overflow.
+
+## Not verified
+
+Production deployment, real HTTPS reverse proxy, SSO/MFA, mobile screen readers, student-data privacy compliance, third-party security audit, full browser network E2E, or educational validity. Existing Android APK is not rebuilt by server-only changes.

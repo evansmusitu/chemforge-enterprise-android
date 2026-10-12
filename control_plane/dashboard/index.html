@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>CHEMFORGE Control — Institution workspace</title>
+  <link rel="stylesheet" href="/control/styles.css">
+  <script src="/control/app.js" defer></script>
+</head>
+<body>
+  <div id="sign-in-screen" class="signin-layout">
+    <div class="login-art" aria-hidden="true">
+      <div class="brand"><span class="brand-mark">⌬</span><span>CHEMFORGE <small>CONTROL</small></span></div>
+      <div class="visual-atom">
+        <div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div><div class="nucleus">CF</div>
+      </div>
+      <div class="login-art-copy"><span class="eyebrow light">EDUCATIONAL INTELLIGENCE</span>
+        <h2>Better decisions start with better evidence.</h2>
+        <p>Institution management for connected schools. The student app remains offline-first.</p>
+        <span class="art-tag">ENTERPRISE PILOT • v1.6</span></div>
+    </div>
+    <main class="login-main">
+      <div class="login-top">INSTITUTION ADMINISTRATION <span class="pilot-pill">PRIVATE PILOT</span></div>
+      <section class="login-card" aria-labelledby="signin-title">
+        <div class="icon-tile">◇</div>
+        <span class="eyebrow">SECURE ACCESS</span>
+        <h1 id="signin-title">Welcome to<br>CHEMFORGE Control.</h1>
+        <p class="muted">Enter your institution-issued administrator or teacher credential.</p>
+        <form id="signin-form">
+          <label for="credential">Access credential</label>
+          <div class="input-icon"><span aria-hidden="true">⌁</span><input id="credential" type="password" autocomplete="off" placeholder="cfcp_…" required spellcheck="false" maxlength="120"></div>
+          <p class="field-help">Your credential stays in this tab's memory. It is never saved in browser storage.</p>
+          <button class="btn btn-primary btn-full" type="submit">Access workspace <span aria-hidden="true">↗</span></button>
+        </form>
+        <div id="signin-feedback" role="alert" class="notice hidden"></div>
+        <div class="login-divider"></div>
+        <p class="help-note"><strong>New institution?</strong> An operator must provision a school and issue credentials using the protected CLI. There is no public sign-up.</p>
+      </section>
+      <div class="login-footer">CHEMFORGE CONTROL <span>Institution-scoped • Unverified study evidence</span></div>
+    </main>
+  </div>
+
+  <div id="app-screen" class="shell hidden">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="sidebar-brand"><span class="brand-mark">⌬</span><span>CHEMFORGE <small>CONTROL</small></span></div>
+      <div class="workspace-pill"><span class="workspace-avatar">C</span><span><strong id="tenant-sidebar">Institution</strong><small>Enterprise workspace</small></span></div>
+      <div class="sidebar-label">WORKSPACE</div>
+      <nav id="main-nav">
+        <button data-view="overview" class="nav-item active" type="button"><span aria-hidden="true">▦</span> Overview</button>
+        <button data-view="students" class="nav-item" type="button"><span aria-hidden="true">♙</span> Students</button>
+        <button data-view="assignments" class="nav-item" type="button"><span aria-hidden="true">☷</span> Assignments</button>
+        <button data-view="imports" class="nav-item" type="button"><span aria-hidden="true">⇣</span> Import records</button>
+        <div class="sidebar-label second">ADMINISTRATION</div>
+        <button data-view="teachers" data-admin-only class="nav-item" type="button"><span aria-hidden="true">♙</span> Teachers</button>
+        <button data-view="content" class="nav-item" type="button"><span aria-hidden="true">⬡</span> Content releases</button>
+        <button data-view="audit" data-admin-only class="nav-item" type="button"><span aria-hidden="true">▤</span> Audit log</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="offline-badge"><span class="online-dot"></span> Institutional server</div>
+        <p>Learning happens offline on student devices. Imported evidence is not independently verified.</p>
+        <button id="signout" class="nav-item signout" type="button"><span aria-hidden="true">⇥</span> Sign out</button>
+      </div>
+    </aside>
+
+    <div class="main-pane">
+      <header class="topbar">
+        <div><span class="eyebrow">CHEMFORGE / <span id="breadcrumb">OVERVIEW</span></span></div>
+        <div class="top-right"><span id="role-badge" class="role-badge">ADMIN</span><span class="profile-icon">C</span><span id="actor-label">Institution</span></div>
+      </header>
+      <main class="workspace-content" id="workspace-content">
+        <div class="page-title-row"><div><span class="eyebrow">INSTITUTION INTELLIGENCE</span><h1 id="view-heading">Overview</h1><p id="view-subheading">An at-a-glance view of your school's learning activity.</p></div><button id="refresh" class="btn btn-soft" type="button">↻ Refresh</button></div>
+        <div role="status" aria-live="polite" id="workspace-feedback" class="notice hidden"></div>
+
+        <section id="view-overview" data-view-panel>
+          <div class="welcome-banner"><div><span class="eyebrow light">YOUR INSTITUTION</span><h2 id="welcome-title">Your learning command centre.</h2><p>Track classroom activity, organise revision, and manage learning resources with confidence.</p><span class="banner-note">◉ &nbsp; Student study continues without an internet connection</span></div><div aria-hidden="true" class="banner-symbol">⌬</div></div>
+          <div id="overview-cards" class="stats-grid"></div>
+          <div class="two-cols"><div class="panel"><div class="panel-heading"><h3>Learning activity by cohort</h3><span class="small-tag">UNVERIFIED IMPORTS</span></div><p class="subtle">Study history submitted by teachers; not certified examinations.</p><div id="cohort-overview"></div></div><div class="panel"><div class="panel-heading"><h3>Workspace essentials</h3></div><div class="guidance"><div class="guidance-icon">01</div><div><strong>Organise students</strong><p>Create pseudonymous student records and assign them to a class.</p></div></div><div class="guidance"><div class="guidance-icon">02</div><div><strong>Distribute activities</strong><p>Set curriculum-aligned revision assignments for each cohort.</p></div></div><div class="guidance"><div class="guidance-icon">03</div><div><strong>Import offline history</strong><p>Review imported attempt counts with their verification status clearly labelled.</p></div></div></div></div>
+        </section>
+
+        <section id="view-students" data-view-panel class="hidden"><div class="panel"><div class="panel-heading"><div><h3>Student directory</h3><p class="subtle">Pseudonyms only. No personal identifiers required.</p></div><span id="student-total" class="counter-tag"></span></div><form id="student-form" class="inline-form"><label>Student pseudonym<input name="pseudonym" required maxlength="80" placeholder="Learner 001"></label><label>Cohort<input name="cohort" required maxlength="40" placeholder="Upper 6 - A"></label><button class="btn btn-primary" type="submit">+ Add student</button></form><label class="search-label">Search students<input id="student-search" type="search" placeholder="Search name or cohort…" autocomplete="off"></label><div class="table-wrap"><table><thead><tr><th>STUDENT</th><th>COHORT</th><th>REGISTERED</th><th class="admin-col">ACTION</th></tr></thead><tbody id="students-body"></tbody></table></div></div></section>
+
+        <section id="view-assignments" data-view-panel class="hidden"><div class="panel"><div class="panel-heading"><div><h3>Classroom assignments</h3><p class="subtle">Plan syllabus objectives for a selected cohort.</p></div></div><form id="assignment-form" class="form-grid"><label>Assignment title<input name="title" required maxlength="120" placeholder="Energetics revision"></label><label>Target cohort<input name="cohort" required maxlength="40" placeholder="Upper 6 - A"></label><label>Objective IDs (comma-separated)<input name="objective_ids" required placeholder="CH-CHEM-001, CH-CHEM-002"></label><label>Due date (optional)<input name="due_at" type="datetime-local"></label><div class="form-actions"><button class="btn btn-primary" type="submit">+ Create assignment</button></div></form><div class="table-wrap"><table><thead><tr><th>ASSIGNMENT</th><th>COHORT</th><th>OBJECTIVES</th><th>DUE</th></tr></thead><tbody id="assignments-body"></tbody></table></div></div></section>
+
+        <section id="view-imports" data-view-panel class="hidden"><div class="panel"><div class="panel-heading"><div><h3>Import offline records</h3><span class="warning-pill">UNVERIFIED EVIDENCE</span></div><p class="subtle">Select the roster student associated with a local CHEMFORGE Android JSON export. Records are not certified.</p></div><div class="import-layout"><div class="panel"><form id="backup-form" class="form-stack"><label>Student record<select id="backup-student" required><option value="">Select a student</option></select></label><label>Android backup (JSON; max 2 MB)<input id="backup-file" type="file" accept=".json,application/json" required></label><div class="import-callout">⊙ All imported marks are labelled <strong>unverified</strong>. File origin and assessment integrity cannot be proven through manual import.</div><button class="btn btn-primary" type="submit">⇣ Import JSON backup</button></form></div><div class="panel tips-panel"><h3>How to import</h3><ol><li>Export a learning-record JSON file from the offline Android app.</li><li>Register or select the matching pseudonymous learner.</li><li>Import the file using your institution's approved transfer method.</li><li>Review the received/unchanged counts; neither represents a verified exam score.</li></ol><p class="subtle">Institution and curriculum fingerprints are checked before records are accepted.</p></div></div></section>
+
+        <section id="view-teachers" data-view-panel class="hidden"><div class="panel"><div class="panel-heading"><div><h3>Teacher access</h3><p class="subtle">Issue a credential once, then revoke it whenever access should end.</p></div></div><form id="teacher-form" class="inline-form"><label>Teacher display label<input name="label" required maxlength="80" placeholder="Chemistry Teacher"></label><button class="btn btn-primary" type="submit">+ Issue credential</button></form><div id="new-token" class="credential-panel hidden" role="status"><h4>One-time credential</h4><p>Copy it securely now. CHEMFORGE does not store the plaintext credential.</p><code id="new-token-value"></code><button id="dismiss-token" class="btn btn-soft" type="button">Dismiss credential</button></div><div class="table-wrap"><table><thead><tr><th>TEACHER</th><th>ENROLLED</th><th>ACCESS</th></tr></thead><tbody id="teachers-body"></tbody></table></div></div></section>
+
+        <section id="view-content" data-view-panel class="hidden"><div class="panel"><div class="panel-heading"><div><h3>Curriculum release registry</h3><p class="subtle">Metadata record only. Registering a release does not cryptographically sign a curriculum pack.</p></div></div><form id="release-form" class="form-grid admin-only"><label>Pack version<input name="pack_version" type="number" min="1" required placeholder="1"></label><label>Curriculum version<input name="content_version" required maxlength="120" placeholder="2026-oct-approved"></label><label>Pack SHA-256<input name="pack_sha256" minlength="64" maxlength="64" required pattern="[0-9a-f]{64}" placeholder="64 lowercase hex characters"></label><label>Content fingerprint<input name="content_fingerprint" minlength="64" maxlength="64" required pattern="[0-9a-f]{64}" placeholder="64 lowercase hex characters"></label><div class="form-actions"><button class="btn btn-primary" type="submit">+ Register metadata</button></div></form><div class="table-wrap"><table><thead><tr><th>REVISION</th><th>CURRICULUM</th><th>PACK HASH</th><th>REGISTERED</th></tr></thead><tbody id="releases-body"></tbody></table></div></div></section>
+
+        <section id="view-audit" data-view-panel class="hidden"><div class="panel"><div class="panel-heading"><div><h3>Administrative activity</h3><p class="subtle">Latest events recorded for this institution.</p></div></div><div class="table-wrap"><table><thead><tr><th>EVENT</th><th>SUBJECT</th><th>TIME</th></tr></thead><tbody id="audit-body"></tbody></table></div></div></section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

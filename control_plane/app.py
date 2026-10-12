@@ -5,6 +5,7 @@ INTERNET permission. No endpoint certifies imported assessment marks.
 """
 
 from pathlib import Path
+from fastapi.responses import FileResponse
 from datetime import datetime
 from hashlib import sha256
 from typing import Annotated, Literal
@@ -15,7 +16,6 @@ import re
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
-from fastapi.responses import FileResponse
 
 from .db import Database, new_token, token_digest, utcnow
 
@@ -135,33 +135,34 @@ def create_app(db_path: str | None = None) -> FastAPI:
     app = FastAPI(title='CHEMFORGE Control',version='0.2.0',
                   description='Tenant-isolated administrative pilot; imported marks are unverified.')
 
-    console_dir = Path(__file__).resolve().parent / 'console'
-    no_store = {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
-                'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer'}
-    console_csp = ("default-src 'none'; script-src 'self'; "
-                   "style-src 'self'; connect-src 'self'; img-src 'self'; "
-                   "base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'")
+    # Same-origin dashboard assets; keep credentials in volatile browser memory only.
+    # The shell is public. Every institution data request still uses the API's
+    # existing bearer authentication and tenant-level authorization.
+    dashboard_dir = Path(__file__).resolve().parent / 'dashboard'
+    dashboard_headers = {
+        'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; "
+                                   "connect-src 'self'; img-src 'self' data:; "
+                                   "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'no-referrer',
+        'X-Frame-Options': 'DENY',
+    }
 
-    @app.middleware('http')
-    async def private_responses(request, call_next):
-        response = await call_next(request)
-        for header, value in no_store.items():
-            response.headers[header] = value
-        if request.url.path.startswith('/console'):
-            response.headers['Content-Security-Policy'] = console_csp
-        return response
+    @app.get('/control/', include_in_schema=False)
+    def dashboard_shell():
+        return FileResponse(dashboard_dir / 'index.html', media_type='text/html',
+                            headers=dashboard_headers)
 
-    @app.get('/console', include_in_schema=False)
-    def console():
-        return FileResponse(console_dir / 'index.html', media_type='text/html')
+    @app.get('/control/app.js', include_in_schema=False)
+    def dashboard_javascript():
+        return FileResponse(dashboard_dir / 'app.js', media_type='text/javascript',
+                            headers=dashboard_headers)
 
-    @app.get('/console/app.js', include_in_schema=False)
-    def console_script():
-        return FileResponse(console_dir / 'app.js', media_type='application/javascript')
-
-    @app.get('/console/style.css', include_in_schema=False)
-    def console_styles():
-        return FileResponse(console_dir / 'style.css', media_type='text/css')
+    @app.get('/control/styles.css', include_in_schema=False)
+    def dashboard_styles():
+        return FileResponse(dashboard_dir / 'styles.css', media_type='text/css',
+                            headers=dashboard_headers)
 
     def actor(authorization: Annotated[str | None, Header()] = None):
         if not authorization or not authorization.startswith('Bearer '):
