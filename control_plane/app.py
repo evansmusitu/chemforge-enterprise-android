@@ -6,13 +6,14 @@ INTERNET permission. No endpoint certifies imported assessment marks.
 
 from pathlib import Path
 from fastapi.responses import FileResponse
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from hashlib import sha256
 from typing import Annotated, Literal
 from uuid import uuid4
 import json
 import os
 import re
+import secrets
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
@@ -26,6 +27,16 @@ class StrictModel(BaseModel):
 
 class TeacherIn(StrictModel):
     label: str = Field(min_length=1,max_length=80)
+
+
+class TeacherCohortIn(StrictModel):
+    cohort: str = Field(min_length=1,max_length=40)
+
+
+class DeviceIn(StrictModel):
+    student_id: str = Field(min_length=10,max_length=64)
+    label: str = Field(min_length=1,max_length=80)
+    valid_days: int = Field(default=30,ge=1,le=90)
 
 
 class StudentIn(StrictModel):
@@ -132,7 +143,7 @@ class ReleaseIn(StrictModel):
 
 def create_app(db_path: str | None = None) -> FastAPI:
     db = Database(db_path or os.environ.get('CHEMFORGE_CONTROL_DB','control.sqlite'))
-    app = FastAPI(title='CHEMFORGE Control',version='0.2.0',
+    app = FastAPI(title='CHEMFORGE Control',version='0.3.0',
                   description='Tenant-isolated administrative pilot; imported marks are unverified.')
 
     # Same-origin dashboard assets; keep credentials in volatile browser memory only.
@@ -182,6 +193,30 @@ def create_app(db_path: str | None = None) -> FastAPI:
             raise HTTPException(403,'Institution administrator privilege required')
         return a
 
+    def can_access_cohort(cx, a: dict, cohort: str) -> bool:
+        if a['role']=='admin':
+            return True
+        return cx.execute('''SELECT 1 FROM teacher_cohorts
+             WHERE tenant_id=? AND actor_id=? AND cohort=?''',
+             (a['tenant_id'],a['id'],cohort)).fetchone() is not None
+
+    def enforce_cohort(cx, a: dict, cohort: str):
+        if not can_access_cohort(cx,a,cohort):
+            raise HTTPException(403,'Not assigned to this cohort')
+
+    def require_device(authorization: Annotated[str | None, Header()] = None):
+        if not authorization or not authorization.startswith('Device '):
+            raise HTTPException(401,'Device credential required')
+        secret=authorization[7:]
+        if len(secret)>120 or not re.fullmatch(r'cfsync_[A-Za-z0-9_-]{40,60}',secret):
+            raise HTTPException(401,'Invalid device credential')
+        with db.connect() as cx:
+            row=cx.execute('''SELECT id,tenant_id,student_id,expires_at FROM devices
+                               WHERE token_hash=? AND revoked_at IS NULL''',(token_digest(secret),)).fetchone()
+        if row is None or datetime.fromisoformat(row['expires_at']) <= datetime.now(timezone.utc):
+            raise HTTPException(401,'Expired or revoked device credential')
+        return dict(row)
+
     @app.get('/health')
     def health():
         return {'status':'ok'}
@@ -200,6 +235,41 @@ def create_app(db_path: str | None = None) -> FastAPI:
             db.audit(cx,a['tenant_id'],a['id'],'teacher.created',actor_id)
         return {'actor_id':actor_id,'token':token,'note':'Credential shown only once; store securely.'}
 
+    @app.post('/v1/teachers/{actor_id}/cohorts',status_code=201)
+    def grant_cohort(actor_id: str,body: TeacherCohortIn,a: Annotated[dict,Depends(require_admin)]):
+        with db.connect() as cx:
+            cx.execute('BEGIN IMMEDIATE')
+            teacher=cx.execute('''SELECT id FROM actors WHERE id=? AND tenant_id=?
+                                AND role='teacher' AND revoked_at IS NULL''',
+                                (actor_id,a['tenant_id'])).fetchone()
+            if not teacher:raise HTTPException(404,'Teacher not found')
+            cx.execute('''INSERT OR IGNORE INTO teacher_cohorts(tenant_id,actor_id,cohort,granted_at)
+                          VALUES(?,?,?,?)''',(a['tenant_id'],actor_id,body.cohort,utcnow()))
+            db.audit(cx,a['tenant_id'],a['id'],'teacher.cohort_granted',actor_id)
+        return {'actor_id':actor_id,'cohort':body.cohort}
+
+    @app.get('/v1/teachers/{actor_id}/cohorts')
+    def list_teacher_cohorts(actor_id: str,a: Annotated[dict,Depends(require_admin)]):
+        with db.connect() as cx:
+            teacher=cx.execute('''SELECT id FROM actors WHERE id=? AND tenant_id=?
+                                AND role='teacher' AND revoked_at IS NULL''',
+                                (actor_id,a['tenant_id'])).fetchone()
+            if not teacher:raise HTTPException(404,'Teacher not found')
+            rows=cx.execute('''SELECT cohort FROM teacher_cohorts
+                               WHERE tenant_id=? AND actor_id=? ORDER BY cohort''',
+                               (a['tenant_id'],actor_id)).fetchall()
+            return [x['cohort'] for x in rows]
+
+    @app.delete('/v1/teachers/{actor_id}/cohorts/{cohort}',status_code=204)
+    def remove_cohort(actor_id: str,cohort: str,a: Annotated[dict,Depends(require_admin)]):
+        with db.connect() as cx:
+            cx.execute('BEGIN IMMEDIATE')
+            result=cx.execute('''DELETE FROM teacher_cohorts
+                                 WHERE tenant_id=? AND actor_id=? AND cohort=?''',
+                                 (a['tenant_id'],actor_id,cohort))
+            if not result.rowcount:raise HTTPException(404,'Cohort grant not found')
+            db.audit(cx,a['tenant_id'],a['id'],'teacher.cohort_revoked',actor_id)
+
     @app.get('/v1/teachers')
     def teachers(a: Annotated[dict,Depends(require_admin)]):
         with db.connect() as cx:
@@ -214,12 +284,14 @@ def create_app(db_path: str | None = None) -> FastAPI:
                                  AND role='teacher' AND revoked_at IS NULL''', (utcnow(),actor_id,a['tenant_id']))
             if not result.rowcount:
                 raise HTTPException(404,'Teacher not found')
+            cx.execute('DELETE FROM teacher_cohorts WHERE tenant_id=? AND actor_id=?',(a['tenant_id'],actor_id))
             db.audit(cx,a['tenant_id'],a['id'],'teacher.revoked',actor_id)
 
     @app.post('/v1/students',status_code=201)
     def create_student(body: StudentIn, a: Annotated[dict,Depends(actor)]):
         student_id=str(uuid4())
         with db.connect() as cx:
+            enforce_cohort(cx,a,body.cohort)
             cx.execute('''INSERT INTO students(id,tenant_id,pseudonym,cohort,created_at)
                           VALUES(?,?,?,?,?)''',(student_id,a['tenant_id'],body.pseudonym,body.cohort,utcnow()))
             db.audit(cx,a['tenant_id'],a['id'],'student.created',student_id)
@@ -230,12 +302,14 @@ def create_app(db_path: str | None = None) -> FastAPI:
         if cohort is not None and len(cohort)>40:
             raise HTTPException(422,'cohort too long')
         with db.connect() as cx:
-            if cohort is None:
-                rows=cx.execute('''SELECT id,pseudonym,cohort,created_at FROM students
-                                  WHERE tenant_id=? ORDER BY cohort,pseudonym,id LIMIT 1000''',(a['tenant_id'],)).fetchall()
-            else:
-                rows=cx.execute('''SELECT id,pseudonym,cohort,created_at FROM students
-                                  WHERE tenant_id=? AND cohort=? ORDER BY pseudonym,id LIMIT 1000''',(a['tenant_id'],cohort)).fetchall()
+            clause='''( ?='admin' OR EXISTS (SELECT 1 FROM teacher_cohorts tc
+                 WHERE tc.tenant_id=s.tenant_id AND tc.actor_id=? AND tc.cohort=s.cohort))'''
+            params=[a['tenant_id'],a['role'],a['id']]
+            if cohort is not None:
+                clause += ' AND s.cohort=?'
+                params.append(cohort)
+            rows=cx.execute('SELECT s.id,s.pseudonym,s.cohort,s.created_at FROM students s '
+                            'WHERE s.tenant_id=? AND '+clause+' ORDER BY s.cohort,s.pseudonym,s.id LIMIT 1000',params).fetchall()
         return [dict(r) for r in rows]
 
     @app.delete('/v1/students/{student_id}',status_code=204)
@@ -250,6 +324,7 @@ def create_app(db_path: str | None = None) -> FastAPI:
     def create_assignment(body: AssignmentIn,a: Annotated[dict,Depends(actor)]):
         assignment_id=str(uuid4())
         with db.connect() as cx:
+            enforce_cohort(cx,a,body.cohort)
             cx.execute('''INSERT INTO assignments(id,tenant_id,title,cohort,objectives_json,due_at,actor_id,created_at)
                           VALUES(?,?,?,?,?,?,?,?)''',(assignment_id,a['tenant_id'],body.title,body.cohort,
                           json.dumps(body.objective_ids),body.due_at.isoformat() if body.due_at else None,a['id'],utcnow()))
@@ -261,7 +336,7 @@ def create_app(db_path: str | None = None) -> FastAPI:
     def assignments(a: Annotated[dict,Depends(actor)]):
         with db.connect() as cx:
             rows=cx.execute('''SELECT id,title,cohort,objectives_json,due_at,created_at FROM assignments
-                               WHERE tenant_id=? ORDER BY created_at DESC,id DESC LIMIT 1000''',(a['tenant_id'],)).fetchall()
+                               WHERE tenant_id=? AND (?='admin' OR EXISTS(SELECT 1 FROM teacher_cohorts tc WHERE tc.tenant_id=assignments.tenant_id AND tc.actor_id=? AND tc.cohort=assignments.cohort)) ORDER BY created_at DESC,id DESC LIMIT 1000''', (a['tenant_id'],a['role'],a['id'])).fetchall()
         return [dict(id=r['id'], title=r['title'], cohort=r['cohort'],
                      objective_ids=json.loads(r['objectives_json']), due_at=r['due_at'],
                      created_at=r['created_at']) for r in rows]
@@ -275,10 +350,11 @@ def create_app(db_path: str | None = None) -> FastAPI:
         with db.connect() as cx:
             # Serialize writes to avoid a concurrent duplicate insert becoming an internal error.
             cx.execute('BEGIN IMMEDIATE')
-            member=cx.execute('SELECT 1 FROM students WHERE tenant_id=? AND id=?',
+            member=cx.execute('SELECT cohort FROM students WHERE tenant_id=? AND id=?',
                               (a['tenant_id'],body.student_id)).fetchone()
             if member is None:
                 raise HTTPException(404,'Student not found')
+            enforce_cohort(cx,a,member['cohort'])
             previous=cx.execute('''SELECT payload_sha256 FROM evidence
                                    WHERE tenant_id=? AND event_id=?''',(a['tenant_id'],body.event_id)).fetchone()
             if previous is not None:
@@ -293,46 +369,85 @@ def create_app(db_path: str | None = None) -> FastAPI:
             db.audit(cx,a['tenant_id'],a['id'],'evidence.imported',body.event_id)
         return status_response_created({'event_id':body.event_id,'verification_status':'unverified_import','disposition':'received'})
 
-    @app.post('/v1/students/{student_id}/backups')
-    def import_offline_backup(student_id: str, body: BackupIn, a: Annotated[dict,Depends(actor)]):
-        """Teacher-controlled manual Android JSON import. Always unverified.
-
-        Atomic and idempotent; the Android student application keeps operating offline.
-        """
+    def ingest_backup(student_id: str,body: BackupIn,tenant_id: str,actor_id: str,
+                      cohort_actor: dict | None = None):
+        # Atomic, idempotent, unverified. Device-auth never chooses student_id.
         imported=0
         unchanged=0
         with db.connect() as cx:
             cx.execute('BEGIN IMMEDIATE')
-            if not cx.execute('SELECT 1 FROM students WHERE tenant_id=? AND id=?',
-                              (a['tenant_id'],student_id)).fetchone():
-                raise HTTPException(404,'Student not found')
-            if body.tenant_id != a['tenant_id']:
+            member=cx.execute('SELECT cohort FROM students WHERE tenant_id=? AND id=?',
+                              (tenant_id,student_id)).fetchone()
+            if member is None:raise HTTPException(404,'Student not found')
+            if cohort_actor is not None:enforce_cohort(cx,cohort_actor,member['cohort'])
+            if body.tenant_id != tenant_id:
                 raise HTTPException(422,'Backup tenant must match your institution')
             for att in body.attempts:
-                mapped = {'event_id':att.id, 'student_id':student_id,'question_id':att.question_id,
-                          'mark':att.mark,'max_marks':att.max_marks,
-                          'assessment_source':att.assessment_source, 'hints_used':att.hints_used,
-                          'mode':att.mode,'content_fingerprint':body.content_fingerprint,
-                          'content_version':body.content_version,'recorded_at':att.recorded_at.isoformat(),
-                          'unverified_import':True}
+                mapped={'event_id':att.id,'student_id':student_id,'question_id':att.question_id,
+                        'mark':att.mark,'max_marks':att.max_marks,
+                        'assessment_source':att.assessment_source,'hints_used':att.hints_used,
+                        'mode':att.mode,'content_fingerprint':body.content_fingerprint,
+                        'content_version':body.content_version,'recorded_at':att.recorded_at.isoformat(),
+                        'unverified_import':True}
                 canonical=json.dumps(mapped,sort_keys=True,separators=(',',':'))
                 digest=sha256(canonical.encode()).hexdigest()
                 previous=cx.execute('SELECT payload_sha256 FROM evidence WHERE tenant_id=? AND event_id=?',
-                                    (a['tenant_id'],att.id)).fetchone()
+                                    (tenant_id,att.id)).fetchone()
                 if previous:
-                    if previous['payload_sha256'] != digest:
+                    if previous['payload_sha256']!=digest:
                         raise HTTPException(409,'Existing event conflicts with imported record')
-                    unchanged += 1
+                    unchanged+=1
                     continue
                 cx.execute('''INSERT INTO evidence(tenant_id,event_id,student_id,question_id,payload_sha256,
                               payload_json,verification_status,received_at) VALUES(?,?,?,?,?,?,?,?)''',
-                              (a['tenant_id'],att.id,student_id,att.question_id,digest,canonical,
-                               'unverified_import',utcnow()))
-                imported += 1
-            db.audit(cx,a['tenant_id'],a['id'],'backup.imported',student_id)
+                           (tenant_id,att.id,student_id,att.question_id,digest,canonical,'unverified_import',utcnow()))
+                imported+=1
+            db.audit(cx,tenant_id,actor_id,'backup.imported',student_id)
         data={'student_id':student_id,'imported':imported,'unchanged':unchanged,'verified':0,
               'disclaimer':'Student-controlled export; not independently verified or certified.'}
         return status_response_created(data) if imported else data
+
+    @app.post('/v1/students/{student_id}/backups')
+    def import_offline_backup(student_id: str,body: BackupIn,a: Annotated[dict,Depends(actor)]):
+        return ingest_backup(student_id,body,a['tenant_id'],a['id'],cohort_actor=a)
+
+    @app.post('/v1/devices',status_code=201)
+    def register_device(body: DeviceIn,a: Annotated[dict,Depends(require_admin)]):
+        secret='cfsync_'+secrets.token_urlsafe(32)
+        device_id=str(uuid4())
+        expires=(datetime.now(timezone.utc)+timedelta(days=body.valid_days)).isoformat()
+        with db.connect() as cx:
+            cx.execute('BEGIN IMMEDIATE')
+            if not cx.execute('SELECT 1 FROM students WHERE tenant_id=? AND id=?',
+                              (a['tenant_id'],body.student_id)).fetchone():
+                raise HTTPException(404,'Student not found')
+            cx.execute('''INSERT INTO devices(id,tenant_id,student_id,label,token_hash,issued_at,expires_at)
+                          VALUES(?,?,?,?,?,?,?)''',
+                       (device_id,a['tenant_id'],body.student_id,body.label,token_digest(secret),utcnow(),expires))
+            db.audit(cx,a['tenant_id'],a['id'],'device.issued',device_id)
+        return {'device_id':device_id,'student_id':body.student_id,'expires_at':expires,
+                'token':secret,'note':'Shown once; scope is exactly one student, study imports only.'}
+
+    @app.get('/v1/devices')
+    def list_devices(a: Annotated[dict,Depends(require_admin)]):
+        with db.connect() as cx:
+            rows=cx.execute('''SELECT id,student_id,label,issued_at,expires_at FROM devices
+                               WHERE tenant_id=? AND revoked_at IS NULL ORDER BY issued_at DESC,id''',
+                            (a['tenant_id'],)).fetchall()
+        return [dict(row) for row in rows]
+
+    @app.delete('/v1/devices/{device_id}',status_code=204)
+    def revoke_device(device_id: str,a: Annotated[dict,Depends(require_admin)]):
+        with db.connect() as cx:
+            cx.execute('BEGIN IMMEDIATE')
+            changed=cx.execute('''UPDATE devices SET revoked_at=? WHERE id=? AND tenant_id=? AND revoked_at IS NULL''',
+                               (utcnow(),device_id,a['tenant_id']))
+            if not changed.rowcount:raise HTTPException(404,'Device not found')
+            db.audit(cx,a['tenant_id'],a['id'],'device.revoked',device_id)
+
+    @app.post('/v1/sync/backups')
+    def sync_offline_backup(body: BackupIn, device: Annotated[dict,Depends(require_device)]):
+        return ingest_backup(device['student_id'],body,device['tenant_id'],device['id'])
 
     @app.post('/v1/content/releases',status_code=201)
     def publish_release(body: ReleaseIn,a: Annotated[dict,Depends(require_admin)]):
@@ -366,7 +481,7 @@ def create_app(db_path: str | None = None) -> FastAPI:
                               COUNT(e.event_id) AS unverified_attempts
                               FROM students s LEFT JOIN evidence e
                                 ON s.tenant_id=e.tenant_id AND s.id=e.student_id
-                              WHERE s.tenant_id=? GROUP BY s.cohort ORDER BY s.cohort''',(a['tenant_id'],)).fetchall()
+                              WHERE s.tenant_id=? AND (?='admin' OR EXISTS (SELECT 1 FROM teacher_cohorts tc WHERE tc.tenant_id=s.tenant_id AND tc.actor_id=? AND tc.cohort=s.cohort)) GROUP BY s.cohort ORDER BY s.cohort''',(a['tenant_id'],a['role'],a['id'])).fetchall()
         return [{**dict(row),'verified_attempts':0} for row in rows]
 
     @app.get('/v1/audit')

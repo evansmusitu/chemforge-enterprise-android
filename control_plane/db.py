@@ -43,6 +43,16 @@ CREATE TABLE IF NOT EXISTS actors (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_actors_tenant ON actors(tenant_id,role);
+CREATE TABLE IF NOT EXISTS teacher_cohorts (
+  tenant_id TEXT NOT NULL,
+  actor_id TEXT NOT NULL REFERENCES actors(id) ON DELETE CASCADE,
+  cohort TEXT NOT NULL,
+  granted_at TEXT NOT NULL,
+  PRIMARY KEY(tenant_id,actor_id,cohort),
+  FOREIGN KEY(tenant_id) REFERENCES tenants(id)
+);
+CREATE INDEX IF NOT EXISTS idx_teacher_cohorts ON teacher_cohorts(tenant_id,actor_id,cohort);
+
 CREATE TABLE IF NOT EXISTS students (
   id TEXT NOT NULL,
   tenant_id TEXT NOT NULL REFERENCES tenants(id),
@@ -76,6 +86,19 @@ CREATE TABLE IF NOT EXISTS evidence (
   FOREIGN KEY(tenant_id, student_id) REFERENCES students(tenant_id,id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_evidence_student ON evidence(tenant_id,student_id);
+CREATE TABLE IF NOT EXISTS devices (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  label TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  issued_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  revoked_at TEXT,
+  FOREIGN KEY(tenant_id,student_id) REFERENCES students(tenant_id,id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_devices_student ON devices(tenant_id,student_id);
+
 CREATE TABLE IF NOT EXISTS content_releases (
   tenant_id TEXT NOT NULL REFERENCES tenants(id),
   pack_version INTEGER NOT NULL CHECK(pack_version>=1),

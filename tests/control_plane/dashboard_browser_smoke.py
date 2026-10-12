@@ -21,7 +21,7 @@ from control_plane.db import Database
 
 root = Path(__file__).resolve().parents[2]
 assets = root / 'control_plane' / 'dashboard'
-out = Path(os.environ.get('CHEMFORGE_DASHBOARD_CAPTURE', '/mnt/data/CHEMFORGE_v1.6_Dashboard_Preview.png'))
+out = Path(os.environ.get('CHEMFORGE_DASHBOARD_CAPTURE', '/mnt/data/CHEMFORGE_v1.7_Dashboard_Preview.png'))
 
 with TemporaryDirectory() as temp:
     dbfile = str(Path(temp) / 'control.sqlite')
@@ -72,8 +72,23 @@ with TemporaryDirectory() as temp:
             page.locator('#new-token-value').get_by_text('cfcp_', exact=False).wait_for()
             teacher = page.locator('#new-token-value').text_content()
             assert teacher.startswith('cfcp_')
+            # Give teacher explicit, narrow cohort access; never default to all students.
+            page.locator('#teacher-cohort-select option').nth(1).wait_for(state='attached')
+            page.locator('#teacher-cohort-select').select_option(index=1)
+            page.locator('#teacher-cohort-form input[name=cohort]').fill('U6-A')
+            page.get_by_role('button',name='Grant cohort').click()
+            page.locator('#teacher-cohort-list').get_by_text('U6-A').wait_for()
             page.get_by_role('button',name='Dismiss credential').click()
             assert page.locator('#new-token-value').text_content()==''
+            page.locator('button[data-view=devices]').click()
+            page.locator('#device-student option').nth(1).wait_for(state='attached')
+            page.locator('#device-student').select_option(index=1)
+            page.locator('#device-form input[name=label]').fill('School tablet 1')
+            page.get_by_role('button',name='Issue device credential').click()
+            page.locator('#device-token-value').get_by_text('cfsync_', exact=False).wait_for()
+            page.locator('#devices-body').get_by_text('School tablet 1').wait_for()
+            page.get_by_role('button',name='Dismiss credential').last.click()
+            assert page.locator('#device-token-value').text_content()==''
             page.locator('button[data-view=imports]').click()
             page.locator('#backup-student option').nth(1).wait_for(state='attached')
             page.locator('#backup-student').select_option(index=1)
@@ -95,7 +110,7 @@ with TemporaryDirectory() as temp:
             page.set_viewport_size({'width':390,'height':840})
             page.wait_for_timeout(250)
             assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth + 2'), 'Mobile page overflows'
-            mobile = out.with_name('CHEMFORGE_v1.6_Dashboard_Mobile_Preview.png')
+            mobile = out.with_name('CHEMFORGE_v1.7_Dashboard_Mobile_Preview.png')
             page.screenshot(path=str(mobile),full_page=True)
             page.set_viewport_size({'width':1440,'height':1000})
             page.locator('#signout').click()
@@ -105,8 +120,11 @@ with TemporaryDirectory() as temp:
             page.locator('#role-badge').get_by_text('TEACHER').wait_for()
             assert page.locator('button[data-view=teachers]').is_hidden()
             assert page.locator('button[data-view=audit]').is_hidden()
+            assert page.locator('button[data-view=devices]').is_hidden()
+            page.locator('button[data-view=students]').click()
+            page.locator('#students-body').get_by_text('<img src=x onerror=alert(1)>').wait_for()
             assert not errors, errors
             browser.close()
-        print('Dashboard Chromium DOM/API smoke: PASS — admin, roster, XSS, assignment, teacher, backup, roles')
+        print('Dashboard Chromium DOM/API smoke: PASS — admin, cohort-grant, scoped devices, roster, XSS, assignment, backup, roles')
         print('Note: browser localhost blocked; TestClient bridges real API; secure-origin check bypassed in test only')
         print('Preview:',out)

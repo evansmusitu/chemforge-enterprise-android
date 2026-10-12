@@ -5,7 +5,7 @@
   let credential = null;
   let identity = null;
   let currentView = 'overview';
-  let dataset = { students: [], assignments: [], analytics: [], teachers: [], releases: [], audit: [] };
+  let dataset = { students: [], assignments: [], analytics: [], teachers: [], devices: [], releases: [], audit: [] };
   const $ = id => document.getElementById(id);
   const viewMetadata = {
     overview: ['Overview', 'An at-a-glance view of your school\'s learning activity.'],
@@ -13,6 +13,7 @@
     assignments: ['Assignments', 'Plan curriculum-focused tasks for your classes.'],
     imports: ['Import records', 'Bring offline Android learning histories into this workspace.'],
     teachers: ['Teachers', 'Control teaching staff access to your institution.'],
+    devices: ['Device sync', 'Provision scoped, expiring device credentials for later optional synchronisation.'],
     content: ['Content releases', 'Version and organise curriculum package metadata.'],
     audit: ['Audit log', 'Review recent institutional administrative operations.']
   };
@@ -70,7 +71,9 @@
     $('credential').value = '';
     $('new-token-value').textContent = '';
     $('new-token').classList.add('hidden');
-    dataset = { students: [], assignments: [], analytics: [], teachers: [], releases: [], audit: [] };
+    $('device-token-value').textContent = '';
+    $('device-new-token').classList.add('hidden');
+    dataset = { students: [], assignments: [], analytics: [], teachers: [], devices: [], releases: [], audit: [] };
   }
   function logout() {
     clearVolatileSecrets();
@@ -109,10 +112,11 @@
     hideFeedback();
     const routes = {
       students:'/v1/students',assignments:'/v1/assignments',analytics:'/v1/analytics/cohorts',
-      teachers:'/v1/teachers',releases:'/v1/content/releases',audit:'/v1/audit'
+      teachers:'/v1/teachers',devices:'/v1/devices',releases:'/v1/content/releases',audit:'/v1/audit'
     };
     const keys = currentView === 'overview' ? ['students','assignments','analytics',...(canAdmin()?['teachers']:[])]
       : currentView === 'imports' ? ['students']
+      : currentView === 'devices' ? ['devices','students']
       : currentView === 'content' ? ['releases']
       : currentView === 'audit' ? ['audit']
       : [currentView];
@@ -126,7 +130,7 @@
     }
   }
   function switchView(view) {
-    if (!Object.hasOwn(viewMetadata, view) || (!canAdmin() && (view === 'teachers' || view === 'audit'))) return;
+    if (!Object.hasOwn(viewMetadata, view) || (!canAdmin() && (view === 'teachers' || view === 'audit' || view === 'devices'))) return;
     currentView = view;
     for (const panel of document.querySelectorAll('[data-view-panel]')) {
       panel.classList.toggle('hidden', panel.id !== `view-${view}`);
@@ -148,6 +152,7 @@
       case 'assignments': return renderAssignments();
       case 'imports': return renderBackupSelect();
       case 'teachers': return renderTeachers();
+      case 'devices': return renderDevices();
       case 'content': return renderReleases();
       case 'audit': return renderAudit();
       default: break;
@@ -220,12 +225,59 @@
   }
   function renderTeachers() {
     const body=$('teachers-body');clearChildren(body);
-    if(!dataset.teachers.length){addEmptyRow(body,'No teachers registered yet.',3);return;}
+    const select=$('teacher-cohort-select'), selected=select.value;clearChildren(select);
+    const empty=node('option','Select teacher');empty.value='';select.append(empty);
+    for(const teacher of dataset.teachers){const option=node('option',teacher.label);option.value=teacher.id;select.append(option);}
+    if(dataset.teachers.some(t=>t.id===selected))select.value=selected;
+    if(!dataset.teachers.length){addEmptyRow(body,'No teachers registered yet.',3);refreshTeacherGrants();return;}
+    refreshTeacherGrants();
     for(const teacher of dataset.teachers){const tr=node('tr');const c=cell();c.append(node('span',teacher.label,'table-name'));const action=cell();action.append(actionButton('Revoke access',async()=>{
       if(!window.confirm(`Revoke ${teacher.label}'s credential immediately?`))return;
       try{await api(`/v1/teachers/${encodeURIComponent(teacher.id)}`,{method:'DELETE'});feedback('Teacher credential revoked.');await refresh();}
       catch(e){feedback(humanError(e),true);}
     }));tr.append(c,cell(formatDate(teacher.created_at)),action);body.append(tr);}
+  }
+  function renderDeviceStudents() {
+    const select = $('device-student');
+    const previous = select.value;
+    clearChildren(select);
+    const empty = node('option','Choose student'); empty.value='';select.append(empty);
+    for(const s of dataset.students){const option=node('option',`${s.pseudonym} — ${s.cohort}`);option.value=s.id;select.append(option);}
+    if(dataset.students.some(s=>s.id===previous))select.value=previous;
+  }
+  function renderDevices() {
+    renderDeviceStudents();
+    const body=$('devices-body');clearChildren(body);
+    if(!dataset.devices.length){addEmptyRow(body,'No active device credentials.',4);return;}
+    for(const device of dataset.devices){
+      const tr=node('tr');const person=dataset.students.find(s=>s.id===device.student_id);
+      const action=cell();action.append(actionButton('Revoke',async()=>{
+        if(!window.confirm(`Revoke device ${device.label}?`))return;
+        try{await api(`/v1/devices/${encodeURIComponent(device.id)}`,{method:'DELETE'});feedback('Device credential revoked.');await refresh();}
+        catch(e){feedback(humanError(e),true);}
+      }));
+      tr.append(cell(device.label,'table-name'),cell(person?person.pseudonym:'Student no longer listed'),cell(formatDate(device.expires_at)),action);
+      body.append(tr);
+    }
+  }
+  async function refreshTeacherGrants() {
+    const select=$('teacher-cohort-select'), holder=$('teacher-cohort-list');
+    clearChildren(holder);
+    if(!select.value)return;
+    const id=select.value;
+    try{
+      const grants=await api(`/v1/teachers/${encodeURIComponent(id)}/cohorts`);
+      if(id!==select.value || currentView!=='teachers')return;
+      if(!grants.length){holder.append(node('span','No cohorts assigned — student access denied.'));return;}
+      for(const cohort of grants){
+        const row=node('div',null,'cohort-row');row.append(node('span',cohort));
+        row.append(actionButton('Remove',async()=>{
+          try{await api(`/v1/teachers/${encodeURIComponent(id)}/cohorts/${encodeURIComponent(cohort)}`,{method:'DELETE'});
+            feedback(`Cohort ${cohort} removed.`);await refreshTeacherGrants();}
+          catch(e){feedback(humanError(e),true);}
+        }));holder.append(row);
+      }
+    }catch(e){feedback(humanError(e),true);}
   }
   function renderReleases() {
     const body=$('releases-body');clearChildren(body);
@@ -258,13 +310,32 @@
     postForm(e,'/v1/assignments',{title:String(f.get('title')).trim(),cohort:String(f.get('cohort')).trim(),objective_ids:ids,due_at:timestamp},'Assignment created.');
   });
   $('teacher-form').addEventListener('submit',async e=>{
-    e.preventDefault();
-    try{const data=await api('/v1/teachers',{method:'POST',body:JSON.stringify({label:String(new FormData(e.currentTarget).get('label')).trim()})});
+    e.preventDefault(); const form=e.currentTarget;
+    try{const data=await api('/v1/teachers',{method:'POST',body:JSON.stringify({label:String(new FormData(form).get('label')).trim()})});
       $('new-token-value').textContent=data.token; $('new-token').classList.remove('hidden');
-      e.currentTarget.reset();feedback('Teacher credential issued; display it once and transfer securely.');await refresh();}
+      form.reset();feedback('Teacher credential issued; display it once and transfer securely.');await refresh();}
     catch(err){feedback(humanError(err),true);}
   });
   $('dismiss-token').addEventListener('click',()=>{$('new-token-value').textContent='';$('new-token').classList.add('hidden');});
+  $('teacher-cohort-select').addEventListener('change',refreshTeacherGrants);
+  $('teacher-cohort-form').addEventListener('submit',async e=>{
+    e.preventDefault();const form=e.currentTarget;const f=new FormData(form);
+    try{const id=String(f.get('teacher_id')), cohort=String(f.get('cohort')).trim();
+      await api(`/v1/teachers/${encodeURIComponent(id)}/cohorts`,{method:'POST',body:JSON.stringify({cohort})});
+      form.querySelector('[name=cohort]').value='';feedback(`Granted ${cohort}.`);await refreshTeacherGrants();}
+    catch(err){feedback(humanError(err),true);}
+  });
+  $('device-form').addEventListener('submit',async e=>{
+    e.preventDefault();const form=e.currentTarget;const f=new FormData(form);
+    try{const response=await api('/v1/devices',{method:'POST',body:JSON.stringify({
+      student_id:String(f.get('student_id')),label:String(f.get('label')).trim(),valid_days:Number(f.get('valid_days'))})});
+      $('device-token-value').textContent=response.token;
+      $('device-new-token').classList.remove('hidden');
+      form.querySelector('[name=label]').value='';feedback('Student-scoped device credential issued; store securely.');await refresh();}
+    catch(err){feedback(humanError(err),true);}
+  });
+  $('dismiss-device-token').addEventListener('click',()=>{$('device-token-value').textContent='';$('device-new-token').classList.add('hidden');});
+
   $('backup-form').addEventListener('submit',async e=>{
     e.preventDefault();const file=$('backup-file').files[0];const studentId=$('backup-student').value;
     if(!file||!studentId){feedback('Choose a student and a JSON file.',true);return;}

@@ -73,7 +73,9 @@ def test_unverified_evidence_idempotency_and_tenant_isolation(setup):
 
 def test_admin_audit_and_student_erasure(setup):
     client,token,_=setup
-    teacher=client.post('/v1/teachers',headers=h(token['A']),json={'label':'T'}).json()['token']
+    t=client.post('/v1/teachers',headers=h(token['A']),json={'label':'T'}).json()
+    teacher=t['token']
+    assert client.post(f"/v1/teachers/{t['actor_id']}/cohorts",headers=h(token['A']),json={'cohort':'L6-B'}).status_code==201
     st=client.post('/v1/students',headers=h(teacher),json={'pseudonym':'Deleted learner', 'cohort':'L6-B'})
     assert st.status_code==201, st.text
     student=st.json()['id']
