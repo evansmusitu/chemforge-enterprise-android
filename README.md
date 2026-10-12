@@ -1,4 +1,4 @@
-# CHEMFORGE Enterprise Android and Control Plane (v1.8 alpha)
+# CHEMFORGE Enterprise Android and Control Plane (v1.9 alpha)
 
 **CHEMFORGE Student** has a default offline-only Android build and a separate opt-in connected QA variant for experimental A-Level Chemistry revision. **CHEMFORGE Control** is a separate connected institutional administration service, now with a same-origin browser dashboard. Automatic synchronisation remains unavailable. The connected variant adds a **manual**, explicit-consent, HTTPS upload to the existing student-scoped gateway; the default APK retains **no INTERNET permission**.
 
@@ -24,3 +24,12 @@ See [`docs/RELEASE_v1.7.md`](docs/RELEASE_v1.7.md): teacher cohorts now deny acc
 ## v1.8 (Connected Client Qualification)
 
 See [`docs/RELEASE_v1.8.md`](docs/RELEASE_v1.8.md) for the distinct connected QA Android build. This build has INTERNET access and a host pinned at compile time, and requires an enrolled institution and manually entered student-scoped device credential. A **dummy disabled `.invalid` host is used in CI**. It is not an operational school sync release until a real endpoint is configured and independently end-to-end tested. The default `:app:assembleDebug` APK continues to have no INTERNET permission.
+
+## v1.9 — Live synthetic HTTPS Android-to-teacher staging gate
+
+The GitHub Actions workflow `.github/workflows/staging-e2e-https.yml` builds a **connected QA APK configured only for the Android emulator's `10.0.2.2` alias**. It provisions two **synthetic** schools, teacher/cohort permissions, student-scoped active/revoked/foreign device tokens and an ephemeral self-signed TLS certificate. FastAPI binds only to runner loopback port 443; emulator traffic reaches that isolated loopback server. The instrumentation uses a temporary test-only TLS trust anchor (not present in production APK) and executes the **real native `HttpsURLConnection` upload**. It tests created/duplicate/revoked/foreign receipts. A final HTTPS server query verifies that precisely one **unverified** attempt appears to the authorised teacher, and no data appear for the unrelated school.
+
+This is a **CI-hosted, disposable staging run**, not a permanently deployed public server. No actual school data, real certificates, production SSO or live physical-device network qualification is involved. Production Android's TLS trust and offline APK policy remain unchanged.
+
+Run host-only HTTPS proof locally: `python -m tests.integration.staging_https demo --dir /tmp/chemforge-v19-demo`.
+See `docs/RELEASE_v1.9.md` and `docs/VERIFICATION_v1.9.md`.

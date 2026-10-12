@@ -70,8 +70,8 @@ public class OfflineLaunchTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             WebView web=webView(scenario);
             eventuallyTrue(web,"!!(window.ChemEngine && document.querySelector('#stat-attempts') && document.querySelector('#start-study'))");
-            assertEquals("Offline Android build must not request INTERNET permission",
-                PackageManager.PERMISSION_DENIED,
+            assertEquals("Only the connected build may request INTERNET permission",
+                BuildConfig.SYNC_CONNECTED ? PackageManager.PERMISSION_GRANTED : PackageManager.PERMISSION_DENIED,
                 InstrumentationRegistry.getInstrumentation().getTargetContext().checkSelfPermission(Manifest.permission.INTERNET));
             assertEquals("true",js(web,"document.querySelector('#screen-home').classList.contains('active')"));
         }

@@ -7,9 +7,13 @@ android {
         applicationId 'ai.chemforge.mobile'
         minSdk 26
         targetSdk 35
-        versionCode 15
-        versionName '1.8.0-alpha'
+        versionCode 16
+        versionName '1.9.0-alpha'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    // CI-only instrumented HTTPS staging; normal Android smoke tests remain offline.
+    if (project.hasProperty('chemforgeConnectedTest')) {
+        testBuildType 'connected'
     }
     buildFeatures { buildConfig true }
     def trustedKey = System.getenv('CHEMFORGE_PACK_PUBLIC_KEY_BASE64') ?: ''
