@@ -1,4 +1,4 @@
-# CHEMFORGE Enterprise — Android and Control Plane (v1.6 alpha)
+# CHEMFORGE Enterprise Android and Control Plane (v1.6 alpha)
 
 **CHEMFORGE Student** is an offline-only Android application for experimental A-Level Chemistry revision. **CHEMFORGE Control** is a separate connected institutional administration service, now with a same-origin browser dashboard. These are separate processes: **no automatic Android-to-server synchronisation is implemented**.
 
