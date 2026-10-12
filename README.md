@@ -1,6 +1,6 @@
-# CHEMFORGE Enterprise Android and Control Plane (v1.7 alpha)
+# CHEMFORGE Enterprise Android and Control Plane (v1.8 alpha)
 
-**CHEMFORGE Student** is an offline-only Android application for experimental A-Level Chemistry revision. **CHEMFORGE Control** is a separate connected institutional administration service, now with a same-origin browser dashboard. These are separate processes: **no automatic Android-to-server synchronisation is implemented**.
+**CHEMFORGE Student** has a default offline-only Android build and a separate opt-in connected QA variant for experimental A-Level Chemistry revision. **CHEMFORGE Control** is a separate connected institutional administration service, now with a same-origin browser dashboard. Automatic synchronisation remains unavailable. The connected variant adds a **manual**, explicit-consent, HTTPS upload to the existing student-scoped gateway; the default APK retains **no INTERNET permission**.
 
 ## Current entry points
 
@@ -20,3 +20,7 @@ Android source and emulator build gates were completed in v1.4; they are not rep
 ## v1.7 (Control Plane)
 
 See [`docs/RELEASE_v1.7.md`](docs/RELEASE_v1.7.md): teacher cohorts now deny access by default, and an admin-managed, per-student device upload gateway is available. **The Android client has not gained network permission or automatic synchronisation.**
+
+## v1.8 (Connected Client Qualification)
+
+See [`docs/RELEASE_v1.8.md`](docs/RELEASE_v1.8.md) for the distinct connected QA Android build. This build has INTERNET access and a host pinned at compile time, and requires an enrolled institution and manually entered student-scoped device credential. A **dummy disabled `.invalid` host is used in CI**. It is not an operational school sync release until a real endpoint is configured and independently end-to-end tested. The default `:app:assembleDebug` APK continues to have no INTERNET permission.

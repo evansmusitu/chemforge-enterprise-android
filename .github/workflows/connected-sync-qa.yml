@@ -1,0 +1,46 @@
+name: CHEMFORGE Connected Client QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'app/**'
+      - 'tests/**'
+      - 'scripts/verify_connected_apk.sh'
+      - '.github/workflows/connected-sync-qa.yml'
+permissions:
+  contents: read
+jobs:
+  connected-manifest-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Verify connected source acceptance tests
+        run: python -m unittest discover -s tests -p test_connected_variant_v18.py -v
+      - name: Compile both variants and check manifest permission separation
+        env:
+          # Build-only dummy domain. This QA APK cannot send data to an institution.
+          CHEMFORGE_SYNC_HOST: sync.example.invalid
+        run: |
+          gradle :app:assembleDebug :app:assembleConnected :app:lintConnected --no-daemon --stacktrace
+          bash scripts/verify_apk.sh app/build/outputs/apk/debug/app-debug.apk
+          bash scripts/verify_connected_apk.sh app/build/outputs/apk/connected/app-connected.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CHEMFORGE-v1.8-connected-QA-disabled-host
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            app/build/outputs/apk/connected/app-connected.apk
+            app/build/outputs/apk/connected/connected-sha256.txt

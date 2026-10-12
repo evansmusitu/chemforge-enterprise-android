@@ -332,6 +332,16 @@ function syncModes(){document.querySelectorAll('[data-mode]').forEach(b=>b.class
 document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;syncModes();nextQuestion();}));
 for(const id of ['filter-domain','filter-paper'])$(id).addEventListener('change',nextQuestion);
 $('next-question').addEventListener('click',nextQuestion);
+const syncButton=$('sync-now');
+if(policy.allow_manual_sync===true && policy.allow_data_export && nativeRecordStore &&
+   window.ChemforgeNative?.syncBackup && tenant && !storageLocked){
+ syncButton.hidden=false;
+ syncButton.addEventListener('click',()=>{
+    if(storageProblem){$('storage-message').textContent='Cannot sync: local encrypted storage is unavailable.';return;}
+    if(!persist()){$('storage-message').textContent='Cannot sync unsaved study attempts.';return;}
+    window.ChemforgeNative.syncBackup(tenant,fingerprint);
+ });
+}
 $('export').addEventListener('click',exportStudy);
 $('import').addEventListener('click',()=>{
  if(!policy.allow_data_import)return;

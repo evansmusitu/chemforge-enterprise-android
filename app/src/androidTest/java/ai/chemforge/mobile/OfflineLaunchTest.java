@@ -50,6 +50,22 @@ public class OfflineLaunchTest {
         }
         fail("WebView condition did not become true: "+expression+" returned "+actual);
     }
+    @Test public void assertInstitutionSyncValidationWithoutNetwork() throws Exception {
+        assertFalse(InstitutionSyncClient.validHost("localhost"));
+        assertFalse(InstitutionSyncClient.validHost("sync.example.invalid"));
+        assertFalse(InstitutionSyncClient.validHost("http://school.example.org"));
+        assertTrue(InstitutionSyncClient.validHost("sync.school.example.org"));
+        assertFalse(InstitutionSyncClient.validToken("admin-password"));
+        String record="{\"app\":\"CHEMFORGE_ANDROID\",\"schema_version\":1," +
+            "\"tenant_id\":\"school-one\",\"content_fingerprint\":\"pilot-0.1\"," +
+            "\"attempts\":[{\"tenant_id\":\"school-one\",\"content_fingerprint\":\"pilot-0.1\"}]}";
+        assertEquals(1,InstitutionSyncClient.countVerifiedShape(record,"school-one","pilot-0.1"));
+        boolean rejected=false;
+        try {InstitutionSyncClient.countVerifiedShape(record,"school-two","pilot-0.1");}
+        catch(SecurityException expected){rejected=true;}
+        assertTrue("Native client must deny a wrong institution",rejected);
+    }
+
     @Test public void assertOfflineHomeLoads() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             WebView web=webView(scenario);

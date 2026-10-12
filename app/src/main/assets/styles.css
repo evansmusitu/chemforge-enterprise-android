@@ -20,3 +20,5 @@
 
 /* Study-only mock examination interface */
 .mock-progress{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px;margin:20px 0 10px}.mock-progress [role=timer]{font-weight:800;color:var(--lime);font-variant-numeric:tabular-nums;font-size:19px}.mock-feedback{margin-top:12px}.mock-feedback p{font-size:12px;color:var(--muted)}.mock-feedback h3{font-size:14px;margin:0}.mock-choice{display:flex;gap:9px;align-items:center;padding:12px;margin:8px 0;border:1px solid #355a61;border-radius:10px}.mock-choice input{accent-color:var(--lime)}.mock-choice span{font-size:13px}.mock-unreviewed{font-size:11px;color:var(--muted)}.bottom-nav button{font-size:9px;padding:4px 1px}.bottom-nav button span{font-size:21px}
+
+[hidden] { display: none !important; }

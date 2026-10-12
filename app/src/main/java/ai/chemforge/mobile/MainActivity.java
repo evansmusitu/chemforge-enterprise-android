@@ -2,6 +2,10 @@ package ai.chemforge.mobile;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.text.InputType;
+import android.widget.EditText;
+import java.util.concurrent.atomic.AtomicBoolean;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IntentFilter;
@@ -53,6 +57,7 @@ public final class MainActivity extends Activity {
     private EnterprisePackManager packManager;
     private volatile ManagedPolicy policy;
     private boolean receiverRegistered;
+    private final AtomicBoolean uploading = new AtomicBoolean(false);
     private final BroadcastReceiver restrictionsReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) { refreshPolicy(); }
     };
@@ -118,7 +123,7 @@ public final class MainActivity extends Activity {
                 if (name.equals("enterprise_pack.js")) {
                     input = new ByteArrayInputStream(packManager.webViewContentScript(policy.tenantId).getBytes(StandardCharsets.UTF_8));
                 } else if (name.equals("enterprise_policy.js")) {
-                    input = new ByteArrayInputStream(("window.CF_ENTERPRISE_POLICY=JSON.parse(" + JSONObject.quote(policy.asJson()) + ");").getBytes(StandardCharsets.UTF_8));
+                    input = new ByteArrayInputStream(("window.CF_ENTERPRISE_POLICY=JSON.parse(" + JSONObject.quote(browserPolicy()) + ");").getBytes(StandardCharsets.UTF_8));
                 } else input = getAssets().open(name);
                 String mime = name.endsWith(".css") ? "text/css" : name.endsWith(".js") ? "application/javascript" : "text/html";
                 return new WebResourceResponse(mime, "UTF-8", 200, "OK",
@@ -146,12 +151,81 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private boolean isManualSyncAllowed(ManagedPolicy current) {
+        return BuildConfig.SYNC_CONNECTED && current.managed && current.allowExport &&
+            !current.tenantId.isEmpty() && InstitutionSyncClient.validHost(BuildConfig.SYNC_HOST);
+    }
+
+    private String browserPolicy() {
+        try {
+            JSONObject response=new JSONObject(policy.asJson());
+            response.put("allow_manual_sync",isManualSyncAllowed(policy));
+            return response.toString();
+        } catch(JSONException ex) { throw new IllegalStateException(ex); }
+    }
+
+    private void requestManualSync(String tenant,String fingerprint) {
+        ManagedPolicy current=ManagedPolicy.read(this);
+        if(!isManualSyncAllowed(current) || !current.tenantId.equals(tenant)) {
+            alert("Managed institutional sync is unavailable for this build.");return;
+        }
+        if(uploading.get()) {alert("A study-history upload is already running.");return;}
+        final String payload;
+        final int count;
+        try {
+            payload=recordStore.read(tenant,fingerprint);
+            count=InstitutionSyncClient.countVerifiedShape(payload,tenant,fingerprint);
+            if(count==0){alert("No local study attempts to upload.");return;}
+        } catch(Exception invalid) {alert("Encrypted study history is unavailable or invalid.");return;}
+        final EditText secretInput=new EditText(this);
+        secretInput.setSingleLine(true);
+        secretInput.setHint("cfsync_... device credential");
+        secretInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        new AlertDialog.Builder(this)
+            .setTitle("Institutional device credential")
+            .setMessage("Enter the student-scoped credential issued by your school. It is not stored by CHEMFORGE.")
+            .setView(secretInput)
+            .setNegativeButton("Cancel",(dialog,which)->secretInput.getText().clear())
+            .setPositiveButton("Review upload",(dialog,which)->{
+                String deviceToken=secretInput.getText().toString().trim();
+                secretInput.getText().clear();
+                if(!InstitutionSyncClient.validToken(deviceToken)){
+                    alert("Invalid student-scoped device credential.");return;
+                }
+                new AlertDialog.Builder(this)
+                    .setTitle("Send unverified study history?")
+                    .setMessage("Send "+count+" study attempts and timestamps from institution " + tenant +
+                        " to https://"+BuildConfig.SYNC_HOST+"?\n\n"+
+                        "These records remain UNVERIFIED, not official exam marks. Your local copy stays on this device.")
+                    .setNegativeButton("Cancel",(d,w)->{})
+                    .setPositiveButton("Send now",(d,w)->{
+                        if(!uploading.compareAndSet(false,true))return;
+                        new Thread(()->{
+                            String status;
+                            try {
+                                ManagedPolicy latest=ManagedPolicy.read(this);
+                                if(!isManualSyncAllowed(latest) || !latest.tenantId.equals(tenant))
+                                    throw new SecurityException("Institution permissions changed");
+                                status=InstitutionSyncClient.upload(BuildConfig.SYNC_HOST,deviceToken,payload,tenant,fingerprint);
+                            } catch(Exception failure) {
+                                status="Sync could not finish securely. Check connectivity and institutional provisioning.";
+                            } finally {uploading.set(false);}
+                            alert(status);
+                        },"chemforge-manual-sync").start();
+                    }).show();
+            }).show();
+    }
+
     private boolean matchesRecordTenant(String tenant) {
         ManagedPolicy current = ManagedPolicy.read(this);
         return tenant != null && tenant.equals(current.tenantId);
     }
 
     private final class NativeBridge {
+        @JavascriptInterface public void syncBackup(String tenant,String fingerprint) {
+            if(!BuildConfig.SYNC_CONNECTED) {alert("This CHEMFORGE build has no network access.");return;}
+            runOnUiThread(()->requestManualSync(tenant,fingerprint));
+        }
         /** JSON-envelope so decryption failures cannot masquerade as empty study history. */
         @JavascriptInterface public String loadRecords(String tenant, String fingerprint) {
             try {

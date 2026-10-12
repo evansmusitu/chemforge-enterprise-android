@@ -7,8 +7,8 @@ android {
         applicationId 'ai.chemforge.mobile'
         minSdk 26
         targetSdk 35
-        versionCode 14
-        versionName '1.4.0-alpha'
+        versionCode 15
+        versionName '1.8.0-alpha'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     buildFeatures { buildConfig true }
@@ -29,6 +29,14 @@ android {
     defaultConfig {
         buildConfigField 'String', 'APPROVED_MODEL_SHA256', '\"' + approvedModelHash + '\"'
     }
+    def syncHost = System.getenv('CHEMFORGE_SYNC_HOST') ?: 'sync.example.invalid'
+    if (!(syncHost ==~ /[a-z0-9-]+(\.[a-z0-9-]+)+/) || syncHost.length() > 180) {
+        throw new GradleException('CHEMFORGE_SYNC_HOST must be a lower-case DNS hostname without scheme or port')
+    }
+    defaultConfig {
+        buildConfigField 'boolean', 'SYNC_CONNECTED', 'false'
+        buildConfigField 'String', 'SYNC_HOST', '\"' + syncHost + '\"'
+    }
     buildTypes {
         release {
             minifyEnabled false
@@ -38,6 +46,12 @@ android {
             applicationIdSuffix '.debug'
             versionNameSuffix '-debug'
         }
+        connected {
+            initWith debug
+            applicationIdSuffix '.connected'
+            versionNameSuffix '-connected'
+            buildConfigField 'boolean', 'SYNC_CONNECTED', 'true'
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -46,7 +60,8 @@ android {
     lint { abortOnError true }
 }
 
-// Model executes in the app process. No API keys, cloud backend, or INTERNET permission.
+// Model executes in-app; offline debug APK has no INTERNET permission.
+// Separate connected QA APK may opt into native institution-only uploads.
 // Pin exact runtime version to make build inputs reproducible.
 kotlin {
     compilerOptions {
