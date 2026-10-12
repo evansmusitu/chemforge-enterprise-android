@@ -1,4 +1,4 @@
-# CHEMFORGE Control — Enterprise administration pilot (v1.7)
+# CHEMFORGE Control — Enterprise administration pilot (v2.0-alpha)
 
 A separate **server-side** administration component for managed schools. **The CHEMFORGE Student Android APK retains its offline-only architecture and does not need a network connection.** This component is not linked to Android for automatic synchronisation; explicit JSON-export import provides a manual bridge.
 
@@ -60,3 +60,34 @@ The Devices tab can issue an expiring credential for a selected student and revo
 **For a private, trusted pilot only.** Before real schools: implement SSO/OIDC and MFA, a comprehensive per-teacher authorization audit, TLS and trusted reverse proxy, audit integrity, encrypted server backups, periodic token expiration/rotation, administration safeguards, retention, consent/legal-basis validation, child-data protection, rate limiting, API pagination, threat modelling, and independent security audit. SQLite is single-node storage, not a scalable institutional database. The public HTTP API must not be exposed to the open internet as-is.
 
 Android never uploads automatically in this version; the new device upload API is usable by a separate permitted client only. The server stores no AI-generated explanations or students' free-form answer text. The student-facing app's question bank is still provisional and not a complete expert-approved ZIMSEC syllabus.
+
+
+## v2.0-alpha: opt-in OIDC staff access token gate
+
+The default **pilot** auth mode is retained for existing synthetic CI and legacy staging. `CHEMFORGE_STAFF_AUTH=oidc` switches staff API authentication entirely to **JWT access-token validation**. In that mode `cfcp_` staff bearer capabilities no longer authenticate, although `cfsync_` **student-device** upload credentials remain deliberately separate. A newly created teacher receives a local actor ID **but no pilot bearer token** and cannot sign in until linked by an operator.
+
+Supported access-token profile is deliberately narrow: RS256 public signatures, explicit `typ: at+jwt` (or `application/at+jwt`), dedicated exact single-value `aud`, HTTPS `iss`, `sub`, `iat`, `nbf`, `exp`, `jti`, `client_id`, duration ≤ 60 minutes, and an `amr` list containing `mfa`. Tokens without an MFA assertion or from unlinked, foreign, or revoked staff are refused. Provider-side policies **must** actually enforce MFA; the server cannot infer genuine MFA from a claim if the issuer is misconfigured. External token `role`, `tenant_id` or `email` never changes the mapped local school role.
+
+1. Use the existing **operator-only** `bootstrap` command and teacher-management API in an isolated pilot to create school and staff records. Note each actor ID.
+2. Obtain the authorised provider's exact **HTTPS issuer** and an API-specific **resource audience**. Obtain and independently verify the provider's current public signing keys; store a sanitized **public-only** JWKS JSON file under operator control. Key rotation currently requires updating this file and restarting the API. Never supply token-controlled `jku`/`jwk` URLs or any private signing key.
+3. Link an existing, pre-authorised staff account to its immutable issuer `sub` (not email), using **operator access to the SQLite file only**:
+
+   ```bash
+   python -m control_plane.cli link-oidc --db ./chemforge-control.sqlite \
+     --tenant school-demo --actor-id 'UUID_FROM_STAFF_ROSTER' \
+     --issuer 'https://idp.example.org/school' --subject 'PROVIDER_IMMUTABLE_SUBJECT'
+   ```
+
+4. Start an isolated server with the exact provider metadata:
+
+   ```bash
+   export CHEMFORGE_STAFF_AUTH=oidc
+   export CHEMFORGE_OIDC_ISSUER='https://idp.example.org/school'
+   export CHEMFORGE_OIDC_AUDIENCE='chemforge-control-api'
+   export CHEMFORGE_OIDC_JWKS_FILE='/restricted/jwks-public.json'
+   CHEMFORGE_CONTROL_DB=./chemforge-control.sqlite uvicorn control_plane.app:create_app --factory --host 127.0.0.1 --port 8020
+   ```
+
+Startup fails when OIDC configuration or keys are missing, duplicated, weak, private, or malformed. In OIDC mode, authorised staff can supply a valid short-lived provider **access** token to the dashboard form (max 12 KB), which holds it in tab memory only. **Do not paste ID tokens.** The API does **not** implement interactive redirect-based OIDC Authorization Code + PKCE, token renewal, IdP discovery, auto-JWKS retrieval, or global logout. Never expose this pilot directly to the internet or to real school data without a formal identity provider integration, TLS hardening, audit and security review.
+
+See `docs/RELEASE_v2.0.md` for acceptance boundaries.

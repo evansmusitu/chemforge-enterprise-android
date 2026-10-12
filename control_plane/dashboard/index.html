@@ -26,16 +26,16 @@
         <div class="icon-tile">◇</div>
         <span class="eyebrow">SECURE ACCESS</span>
         <h1 id="signin-title">Welcome to<br>CHEMFORGE Control.</h1>
-        <p class="muted">Enter your institution-issued administrator or teacher credential.</p>
+        <p class="muted">Enter a pilot credential or a short-lived OIDC staff access token supplied by your institution. This form is not a full single sign-on flow.</p>
         <form id="signin-form">
           <label for="credential">Access credential</label>
-          <div class="input-icon"><span aria-hidden="true">⌁</span><input id="credential" type="password" autocomplete="off" placeholder="cfcp_…" required spellcheck="false" maxlength="120"></div>
+          <div class="input-icon"><span aria-hidden="true">⌁</span><input id="credential" type="password" autocomplete="off" placeholder="Pilot cfcp_… or OIDC access JWT" required spellcheck="false" maxlength="12000"></div>
           <p class="field-help">Your credential stays in this tab's memory. It is never saved in browser storage.</p>
           <button class="btn btn-primary btn-full" type="submit">Access workspace <span aria-hidden="true">↗</span></button>
         </form>
         <div id="signin-feedback" role="alert" class="notice hidden"></div>
         <div class="login-divider"></div>
-        <p class="help-note"><strong>New institution?</strong> An operator must provision a school and issue credentials using the protected CLI. There is no public sign-up.</p>
+        <p class="help-note"><strong>New institution?</strong> An operator must provision a school and explicitly link OIDC staff subjects using the protected CLI. There is no public sign-up.</p>
       </section>
       <div class="login-footer">CHEMFORGE CONTROL <span>Institution-scoped • Unverified study evidence</span></div>
     </main>

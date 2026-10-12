@@ -1,4 +1,4 @@
-# CHEMFORGE Enterprise Android and Control Plane (v1.9 alpha)
+# CHEMFORGE Enterprise Android and Control Plane (v2.0-alpha identity pilot)
 
 **CHEMFORGE Student** has a default offline-only Android build and a separate opt-in connected QA variant for experimental A-Level Chemistry revision. **CHEMFORGE Control** is a separate connected institutional administration service, now with a same-origin browser dashboard. Automatic synchronisation remains unavailable. The connected variant adds a **manual**, explicit-consent, HTTPS upload to the existing student-scoped gateway; the default APK retains **no INTERNET permission**.
 
@@ -10,7 +10,7 @@
 - Local UI: `CHEMFORGE_CONTROL_DB=... uvicorn control_plane.app:create_app --factory --host 127.0.0.1 --port 8020` then open `http://127.0.0.1:8020/control/`. Use HTTPS for any non-loopback pilot.
 - Server verification: `python -m pytest -q tests/control_plane`.
 
-**Security and scientific limitations:** Control remains a private pilot, without OIDC/SSO, MFA, independent teacher-permission security review, secure production deployment, or independent content validation. Android exports are editable by students; imported marks and cohort analytics are **unverified** and never certified assessment records. Content registry entries are metadata, not signatures. Learn more in `control_plane/README.md` and `docs/RELEASE_v1.7.md`.
+**Security and scientific limitations:** Control remains a private pilot, with only an optional pinned-JWKS OIDC access-token validation gate (not interactive SSO), without an independent teacher-permission security review, secure production deployment, or independent content validation. Android exports are editable by students; imported marks and cohort analytics are **unverified** and never certified assessment records. Content registry entries are metadata, not signatures. Learn more in `control_plane/README.md` and `docs/RELEASE_v1.7.md`.
 
 ## Qualifications achieved vs. pending
 
@@ -35,3 +35,10 @@ Run host-only HTTPS proof locally: `python -m tests.integration.staging_https de
 See `docs/RELEASE_v1.9.md` and `docs/VERIFICATION_v1.9.md`.
 
 The v1.9 gate additionally attempts a real HTTPS Chromium dashboard login using the synthetic teacher token and a private test certificate; the local ChatGPT browser sandbox denies localhost navigation, but the GitHub-hosted real HTTPS browser and Android E2E gate passed in run `38250549933`.
+
+
+## v2.0-alpha — Opt-in staff OIDC bearer validation
+
+The **server-only** `CHEMFORGE_STAFF_AUTH=oidc` mode rejects all pilot staff bearer tokens and accepts only short-lived, MFA-asserting, RSA-signed `at+jwt` access tokens from a *configured* HTTPS issuer and dedicated API audience, validated against operator-pinned local JWKS verification keys. Staff identities must be **manually linked** to existing school-scoped local actors; no account is created from external role or email claims. Revoked local actors remain blocked. See [`docs/RELEASE_v2.0.md`](docs/RELEASE_v2.0.md).
+
+This is **not** a browser authorization-code/PKCE SSO flow. The existing dashboard accepts a manually supplied access token in tab memory; integrating a real identity provider, token acquisition/refresh, security assessment and production deployment are separate gates. The offline Android APK is unchanged.

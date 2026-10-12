@@ -312,8 +312,14 @@
   $('teacher-form').addEventListener('submit',async e=>{
     e.preventDefault(); const form=e.currentTarget;
     try{const data=await api('/v1/teachers',{method:'POST',body:JSON.stringify({label:String(new FormData(form).get('label')).trim()})});
-      $('new-token-value').textContent=data.token; $('new-token').classList.remove('hidden');
-      form.reset();feedback('Teacher credential issued; display it once and transfer securely.');await refresh();}
+      if (typeof data.token === 'string') {
+        $('new-token-value').textContent=data.token; $('new-token').classList.remove('hidden');
+        feedback('Pilot teacher credential issued; transfer it securely.');
+      } else {
+        $('new-token-value').textContent=''; $('new-token').classList.add('hidden');
+        feedback('Teacher created without a pilot credential. An operator must link their OIDC subject using the protected CLI.');
+      }
+      form.reset();await refresh();}
     catch(err){feedback(humanError(err),true);}
   });
   $('dismiss-token').addEventListener('click',()=>{$('new-token-value').textContent='';$('new-token').classList.add('hidden');});

@@ -19,6 +19,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
 from .db import Database, new_token, token_digest, utcnow
+from .identity import OIDCConfiguration, StaffAuthenticationError
 
 
 class StrictModel(BaseModel):
@@ -142,8 +143,12 @@ class ReleaseIn(StrictModel):
 
 
 def create_app(db_path: str | None = None) -> FastAPI:
+    staff_mode=os.environ.get('CHEMFORGE_STAFF_AUTH','pilot').strip().lower()
+    if staff_mode not in ('pilot','oidc'):
+        raise ValueError('CHEMFORGE_STAFF_AUTH must be pilot or oidc')
+    oidc=OIDCConfiguration.from_environment(os.environ) if staff_mode=='oidc' else None
     db = Database(db_path or os.environ.get('CHEMFORGE_CONTROL_DB','control.sqlite'))
-    app = FastAPI(title='CHEMFORGE Control',version='0.3.0',
+    app = FastAPI(title='CHEMFORGE Control',version='0.4.0',
                   description='Tenant-isolated administrative pilot; imported marks are unverified.')
 
     # Same-origin dashboard assets; keep credentials in volatile browser memory only.
@@ -179,6 +184,19 @@ def create_app(db_path: str | None = None) -> FastAPI:
         if not authorization or not authorization.startswith('Bearer '):
             raise HTTPException(401,'Valid Bearer token required',headers={'WWW-Authenticate':'Bearer'})
         secret=authorization[7:]
+        if staff_mode=='oidc':
+            try:
+                subject=oidc.verify(secret)
+            except StaffAuthenticationError:
+                raise HTTPException(401,'Invalid OIDC access token',headers={'WWW-Authenticate':'Bearer'})
+            with db.connect() as cx:
+                row=cx.execute('''SELECT a.id,a.tenant_id,a.label,a.role
+                    FROM actors a JOIN oidc_actor_links o ON a.id=o.actor_id
+                    WHERE o.issuer=? AND o.subject=? AND o.tenant_id=a.tenant_id
+                    AND a.revoked_at IS NULL''',(oidc.issuer,subject)).fetchone()
+            if row is None:
+                raise HTTPException(401,'Unrecognised or revoked staff identity',headers={'WWW-Authenticate':'Bearer'})
+            return dict(row)
         if len(secret)>120 or not re.fullmatch(r'cfcp_[A-Za-z0-9_-]{40,60}',secret):
             raise HTTPException(401,'Invalid bearer credential',headers={'WWW-Authenticate':'Bearer'})
         with db.connect() as cx:
@@ -233,6 +251,8 @@ def create_app(db_path: str | None = None) -> FastAPI:
             cx.execute('''INSERT INTO actors(id,tenant_id,label,role,token_hash,created_at)
                           VALUES(?,?,?,?,?,?)''', (actor_id,a['tenant_id'],body.label,'teacher',token_digest(token),utcnow()))
             db.audit(cx,a['tenant_id'],a['id'],'teacher.created',actor_id)
+        if staff_mode=='oidc':
+            return {'actor_id':actor_id,'note':'Link the staff OIDC subject via the protected operator CLI; no pilot token is issued.'}
         return {'actor_id':actor_id,'token':token,'note':'Credential shown only once; store securely.'}
 
     @app.post('/v1/teachers/{actor_id}/cohorts',status_code=201)

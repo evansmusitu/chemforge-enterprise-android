@@ -43,6 +43,16 @@ CREATE TABLE IF NOT EXISTS actors (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_actors_tenant ON actors(tenant_id,role);
+CREATE TABLE IF NOT EXISTS oidc_actor_links (
+  issuer TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  actor_id TEXT NOT NULL UNIQUE REFERENCES actors(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  linked_at TEXT NOT NULL,
+  PRIMARY KEY (issuer, subject)
+);
+CREATE INDEX IF NOT EXISTS idx_oidc_actor_links ON oidc_actor_links(tenant_id,actor_id);
+
 CREATE TABLE IF NOT EXISTS teacher_cohorts (
   tenant_id TEXT NOT NULL,
   actor_id TEXT NOT NULL REFERENCES actors(id) ON DELETE CASCADE,
@@ -164,3 +174,24 @@ class Database:
     def audit(cx: sqlite3.Connection, tenant_id: str, actor_id: str, action: str, subject_id: str):
         cx.execute('''INSERT INTO audit(tenant_id,actor_id,action,subject_id,occurred_at)
                       VALUES(?,?,?,?,?)''',(tenant_id,actor_id,action,subject_id,utcnow()))
+
+    def link_oidc_subject(self, tenant_id: str, actor_id: str, issuer: str, subject: str) -> None:
+        """Trusted operator-only link. No API endpoint may auto-provision accounts."""
+        if (not isinstance(subject,str) or not 1<=len(subject)<=255 or not subject.strip()
+                or not isinstance(issuer,str) or not issuer.startswith('https://')):
+            raise ValueError('Invalid OIDC issuer or subject')
+        with self.connect() as cx:
+            cx.execute('BEGIN IMMEDIATE')
+            actor = cx.execute('''SELECT id FROM actors
+                   WHERE tenant_id=? AND id=? AND role IN ('admin','teacher') AND revoked_at IS NULL''',
+                   (tenant_id,actor_id)).fetchone()
+            if not actor:
+                raise ValueError('Staff actor is missing or belongs to a different institution')
+            if cx.execute('SELECT 1 FROM oidc_actor_links WHERE issuer=? AND subject=?',
+                    (issuer,subject)).fetchone():
+                raise ValueError('OIDC issuer/subject already linked')
+            if cx.execute('SELECT 1 FROM oidc_actor_links WHERE actor_id=?',(actor_id,)).fetchone():
+                raise ValueError('Staff actor already has an OIDC binding')
+            cx.execute('''INSERT INTO oidc_actor_links(issuer,subject,actor_id,tenant_id,linked_at)
+                          VALUES(?,?,?,?,?)''',(issuer,subject,actor_id,tenant_id,utcnow()))
+            self.audit(cx,tenant_id,actor_id,'identity.oidc_linked',actor_id)
