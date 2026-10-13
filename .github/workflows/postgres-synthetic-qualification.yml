@@ -36,6 +36,7 @@ jobs:
       CHEMFORGE_POSTGRES_SYNTHETIC_ONLY: I_ACKNOWLEDGE_DISPOSABLE_SYNTHETIC_DATABASE_ONLY
       CHEMFORGE_PG_DSN: postgresql://chemforge_synthetic:synthetic_ci_only_not_a_real_secret@127.0.0.1:5432/chemforge_synthetic?sslmode=disable
       CHEMFORGE_PG_CI: '1'
+      CHEMFORGE_PG_RESTORE_DSN: postgresql://chemforge_synthetic:synthetic_ci_only_not_a_real_secret@127.0.0.1:5432/chemforge_synthetic_restore?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
