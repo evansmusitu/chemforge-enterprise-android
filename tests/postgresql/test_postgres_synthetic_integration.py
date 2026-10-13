@@ -94,3 +94,52 @@ def test_postgres_api_tenant_roles_revocation_and_unverified_device_upload(pg):
         assert client.get('/v1/students',headers=headers(teacher)).json()==[]
         assert client.delete('/v1/teachers/'+teacher_id,headers=headers(token_a)).status_code==204
         assert client.get('/v1/me',headers=headers(teacher)).status_code==401
+
+
+@pytest.mark.parametrize('change', ['revoke', 'expire', 'switch_student'])
+def test_postgres_device_upload_rechecks_authority_after_dependency(pg,change):
+    """Real PostgreSQL write lock must enforce the post-auth credential state.
+
+    The override wraps the actual auth dependency and then applies a committed
+    synthetic admin DB change before the request handler starts writing.
+    """
+    from fastapi import Header
+    from tests.control_plane.test_institution_sync_v17 import backup
+
+    tenant='race-' + uuid4().hex[:11]
+    token=pg.bootstrap_tenant(tenant,'Synthetic principal')
+    app=create_app()
+    with TestClient(app) as client:
+        first=client.post('/v1/students',headers=headers(token),
+            json={'pseudonym':'Student A','cohort':'U6'}).json()['id']
+        second=client.post('/v1/students',headers=headers(token),
+            json={'pseudonym':'Student B','cohort':'U6'}).json()['id']
+        device=client.post('/v1/devices',headers=headers(token),
+            json={'student_id':first,'label':'Synthetic tablet','valid_days':1}).json()
+        route=next(r for r in app.routes if getattr(r,'path',None)=='/v1/sync/backups')
+        verify=route.dependant.dependencies[0].call
+
+        def after_auth(authorization: str | None = Header(default=None)):
+            identity=verify(authorization)
+            with pg.connect() as cx:
+                if change=='revoke':
+                    cx.execute('UPDATE devices SET revoked_at=? WHERE id=?',
+                        ('2026-10-13T01:00:00+00:00',device['device_id']))
+                elif change=='expire':
+                    cx.execute('UPDATE devices SET expires_at=? WHERE id=?',
+                        ('2020-01-01T00:00:00+00:00',device['device_id']))
+                else:
+                    cx.execute('UPDATE devices SET student_id=? WHERE id=?',
+                        (second,device['device_id']))
+            return identity
+
+        app.dependency_overrides[verify]=after_auth
+        attempt='pg-race-'+uuid4().hex[:12]
+        resp=client.post('/v1/sync/backups', headers={'Authorization':'Device '+device['token']},
+                         json=backup(tenant,attempt))
+        assert resp.status_code==401,resp.text
+        with pg.connect() as cx:
+            assert cx.execute('SELECT COUNT(*) AS n FROM evidence WHERE tenant_id=? AND event_id=?',
+                              (tenant,attempt)).fetchone()['n']==0
+            assert cx.execute('SELECT COUNT(*) AS n FROM audit WHERE tenant_id=? AND action=?',
+                              (tenant,'backup.imported')).fetchone()['n']==0

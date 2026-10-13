@@ -436,12 +436,22 @@ def create_app(db_path: str | None = None) -> FastAPI:
         return status_response_created({'event_id':body.event_id,'verification_status':'unverified_import','disposition':'received'})
 
     def ingest_backup(student_id: str,body: BackupIn,tenant_id: str,actor_id: str,
-                      cohort_actor: dict | None = None):
+                      cohort_actor: dict | None = None, device_id: str | None = None):
         # Atomic, idempotent, unverified. Device-auth never chooses student_id.
         imported=0
         unchanged=0
         with db.connect() as cx:
             cx.execute('BEGIN IMMEDIATE')
+            if device_id is not None:
+                # Device auth precedes the write transaction. An administrator
+                # can revoke or reassign the token between those two moments.
+                # Revalidate under the serialized write lock, including expiry.
+                current=cx.execute('''SELECT expires_at FROM devices
+                    WHERE id=? AND tenant_id=? AND student_id=? AND revoked_at IS NULL''',
+                    (device_id,tenant_id,student_id)).fetchone()
+                if (current is None or
+                        datetime.fromisoformat(current['expires_at']) <= datetime.now(timezone.utc)):
+                    raise HTTPException(401,'Expired or revoked device credential')
             member=cx.execute('SELECT cohort FROM students WHERE tenant_id=? AND id=?',
                               (tenant_id,student_id)).fetchone()
             if member is None:raise HTTPException(404,'Student not found')
@@ -513,7 +523,8 @@ def create_app(db_path: str | None = None) -> FastAPI:
 
     @app.post('/v1/sync/backups')
     def sync_offline_backup(body: BackupIn, device: Annotated[dict,Depends(require_device)]):
-        return ingest_backup(device['student_id'],body,device['tenant_id'],device['id'])
+        return ingest_backup(device['student_id'],body,device['tenant_id'],device['id'],
+                             device_id=device['id'])
 
     @app.post('/v1/content/releases',status_code=201)
     def publish_release(body: ReleaseIn,a: Annotated[dict,Depends(require_admin)]):

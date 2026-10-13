@@ -1,4 +1,4 @@
-# CHEMFORGE Enterprise Android and Control Plane (v2.1 synthetic hardening candidate)
+# CHEMFORGE Enterprise Android and Control Plane (v2.5 synthetic security hardening)
 
 **CHEMFORGE Student** has a default offline-only Android build and a separate opt-in connected QA variant for experimental A-Level Chemistry revision. **CHEMFORGE Control** is a separate connected institutional administration service, now with a same-origin browser dashboard. Automatic synchronisation remains unavailable. The connected variant adds a **manual**, explicit-consent, HTTPS upload to the existing student-scoped gateway; the default APK retains **no INTERNET permission**.
 
@@ -44,3 +44,12 @@ The v1.9 gate additionally attempts a real HTTPS Chromium dashboard login using 
 The **server-only** `CHEMFORGE_STAFF_AUTH=oidc` mode rejects all pilot staff bearer tokens and accepts only short-lived, MFA-asserting, RSA-signed `at+jwt` access tokens from a *configured* HTTPS issuer and dedicated API audience, validated against operator-pinned local JWKS verification keys. Staff identities must be **manually linked** to existing school-scoped local actors; no account is created from external role or email claims. Revoked local actors remain blocked. See [`docs/RELEASE_v2.0.md`](docs/RELEASE_v2.0.md).
 
 This is **not** a browser authorization-code/PKCE SSO flow. The existing dashboard accepts a manually supplied access token in tab memory; integrating a real identity provider, token acquisition/refresh, security assessment and production deployment are separate gates. The offline Android APK is unchanged.
+
+
+## v2.5: device upload authorization is rechecked before writes
+
+After initial Device credential authentication, the upload transaction now rechecks
+revocation, expiration and student/tenant binding before inserting any unverified
+evidence. See docs/DEVICE_REAUTH_ATOMICITY_v2.5.md.
+This is synthetic qualification only: no public backend, no hosted Postgres,
+no real student data and no paid deployment.
