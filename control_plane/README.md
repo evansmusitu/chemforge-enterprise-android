@@ -91,3 +91,10 @@ Supported access-token profile is deliberately narrow: RS256 public signatures, 
 Startup fails when OIDC configuration or keys are missing, duplicated, weak, private, or malformed. In OIDC mode, authorised staff can supply a valid short-lived provider **access** token to the dashboard form (max 12 KB), which holds it in tab memory only. **Do not paste ID tokens.** The API does **not** implement interactive redirect-based OIDC Authorization Code + PKCE, token renewal, IdP discovery, auto-JWKS retrieval, or global logout. Never expose this pilot directly to the internet or to real school data without a formal identity provider integration, TLS hardening, audit and security review.
 
 See `docs/RELEASE_v2.0.md` for acceptance boundaries.
+
+
+## v2.1 synthetic/browser hardening (no deployed IdP)
+
+The old bearer-only OIDC pilot is **not** the recommended institution browser sign-in. The separate `CHEMFORGE_OIDC_BROWSER=enabled` feature now implements server-side OIDC Authorization Code + PKCE S256, state/nonce, public-key token verification, and short-lived HttpOnly sessions for a manually linked local staff actor. It requires operator-supplied valid provider discovery JSON and pinned JWKS; it refuses startup if configuration is incomplete. Synthetic provider tests do not establish working real SSO. Interactive staff requests use cookie session+CSRF/Origin checks, not pasted JWTs. Device sync uses its own independent student-scoped revocable credential and is unaffected.
+
+See `../docs/RELEASE_v2.1.md` for exact configuration and limitations, and `../docs/VERIFICATION_v2.1.md` for reproducible security tests. Production PostgreSQL, provider validation, real hosting and a privacy/security audit are **not implemented**.

@@ -3,6 +3,8 @@
 (() => {
   'use strict';
   let credential = null;
+  let oidcSession = false;
+  let csrfToken = null;
   let identity = null;
   let currentView = 'overview';
   let dataset = { students: [], assignments: [], analytics: [], teachers: [], devices: [], releases: [], audit: [] };
@@ -42,10 +44,11 @@
   function hideFeedback(target = 'workspace-feedback') { $(target).classList.add('hidden'); }
   function humanError(error) { return error instanceof Error ? error.message : 'Request failed'; }
   async function api(path, opts = {}) {
-    if (!credential) throw new Error('Sign in to continue');
+    if (!oidcSession && !credential) throw new Error('Sign in to continue');
     const response = await fetch(path, {
-      ...opts, credentials: 'omit', cache: 'no-store', redirect: 'error',
-      headers: { Authorization: 'Bearer ' + credential, ...(opts.body ? {'Content-Type': 'application/json'} : {}), ...opts.headers }
+      ...opts, credentials: oidcSession ? 'same-origin' : 'omit', cache: 'no-store', redirect: 'error',
+      headers: { ...(oidcSession ? {'X-CF-CSRF': csrfToken} : {Authorization: 'Bearer ' + credential}),
+                 ...(opts.body ? {'Content-Type': 'application/json'} : {}), ...opts.headers }
     });
     if (response.status === 401) {
       logout();
@@ -67,6 +70,7 @@
   }
   function clearVolatileSecrets() {
     credential = null;
+    csrfToken = null;
     identity = null;
     $('credential').value = '';
     $('new-token-value').textContent = '';
@@ -75,11 +79,51 @@
     $('device-new-token').classList.add('hidden');
     dataset = { students: [], assignments: [], analytics: [], teachers: [], devices: [], releases: [], audit: [] };
   }
-  function logout() {
+  async function logout() {
+    if (oidcSession && csrfToken) {
+      try { await fetch('/auth/logout', {method:'POST',credentials:'same-origin',cache:'no-store',
+            headers: {'X-CF-CSRF':csrfToken}}); } catch { /* session also expires on server */ }
+    }
     clearVolatileSecrets();
     $('app-screen').classList.add('hidden');
     $('sign-in-screen').classList.remove('hidden');
     hideFeedback();
+  }
+  function enterWorkspace() {
+    $('tenant-sidebar').textContent = identity.tenant_id;
+    $('actor-label').textContent = identity.label;
+    $('role-badge').textContent = identity.role.toUpperCase();
+    for (const item of document.querySelectorAll('[data-admin-only], .admin-only, .admin-col')) {
+      item.classList.toggle('hidden', !canAdmin());
+    }
+    $('sign-in-screen').classList.add('hidden');
+    $('app-screen').classList.remove('hidden');
+    $('welcome-title').textContent = `${identity.tenant_id} · learning overview`;
+    switchView('overview');
+  }
+  async function initializeAuthentication() {
+    try {
+      const response = await fetch('/auth/capabilities',{cache:'no-store',credentials:'omit'});
+      if (!response.ok) throw new Error('Authentication configuration unavailable');
+      const config = await response.json();
+      oidcSession = config.mode === 'oidc_browser';
+      $('signin-form').classList.toggle('hidden',oidcSession);
+      $('oidc-login').classList.toggle('hidden',!oidcSession);
+      $('signin-description').textContent = oidcSession
+        ? 'Your institution must configure an authorised identity provider. Sign in using your institution account.'
+        : config.mode === 'oidc_bearer'
+          ? 'Legacy isolated OIDC access-token pilot. Interactive SSO is not enabled on this server.'
+          : 'Enter an isolated pilot credential. Interactive SSO is not enabled on this server.';
+      if (oidcSession) {
+        const session = await fetch('/auth/session',{credentials:'same-origin',cache:'no-store'});
+        if (session.status === 401) return;
+        if (!session.ok) throw new Error('Could not validate institutional login');
+        const data = await session.json();
+        csrfToken=data.csrf_token;
+        identity=data.actor;
+        enterWorkspace();
+      }
+    } catch (error) { feedback(humanError(error),true,'signin-feedback'); }
   }
   async function signin(event) {
     event.preventDefault();
@@ -92,16 +136,7 @@
     $('credential').value = '';
     try {
       identity = await api('/v1/me');
-      $('tenant-sidebar').textContent = identity.tenant_id;
-      $('actor-label').textContent = identity.label;
-      $('role-badge').textContent = identity.role.toUpperCase();
-      for (const item of document.querySelectorAll('[data-admin-only], .admin-only, .admin-col')) {
-        item.classList.toggle('hidden', !canAdmin());
-      }
-      $('sign-in-screen').classList.add('hidden');
-      $('app-screen').classList.remove('hidden');
-      $('welcome-title').textContent = `${identity.tenant_id} · learning overview`;
-      switchView('overview');
+      enterWorkspace();
     } catch (error) {
       clearVolatileSecrets();
       feedback(humanError(error), true, 'signin-feedback');
@@ -296,6 +331,7 @@
     catch(e){feedback(humanError(e),true);}
   }
   $('signin-form').addEventListener('submit',signin);
+  initializeAuthentication();
   $('signout').addEventListener('click',logout);
   $('refresh').addEventListener('click',refresh);
   $('student-search').addEventListener('input',()=>{if(currentView==='students')renderStudents();});

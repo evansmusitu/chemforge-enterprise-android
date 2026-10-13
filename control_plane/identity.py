@@ -65,7 +65,7 @@ class OIDCConfiguration:
             raise ValueError('OIDC pinned JWKS is invalid') from exc
         return cls(issuer, audience, keys)
 
-    def verify(self, token: str) -> str:
+    def verify_claims(self, token: str) -> dict:
         if not isinstance(token,str) or len(token)>12000 or token.count('.') != 2:
             raise StaffAuthenticationError('Invalid OIDC access token')
         try:
@@ -91,6 +91,9 @@ class OIDCConfiguration:
                 raise StaffAuthenticationError('Invalid OIDC access token')
             if payload['exp'] - payload['iat'] > 3600:
                 raise StaffAuthenticationError('OIDC access token lifetime exceeds one hour')
-            return sub
+            return payload
         except (jwt_errors.PyJWTError,ValueError,TypeError,KeyError) as exc:
             raise StaffAuthenticationError('Invalid OIDC access token') from exc
+
+    def verify(self, token: str) -> str:
+        return self.verify_claims(token)['sub']

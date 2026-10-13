@@ -15,11 +15,12 @@ import os
 import re
 import secrets
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
 from .db import Database, new_token, token_digest, utcnow
 from .identity import OIDCConfiguration, StaffAuthenticationError
+from .browser_oidc import BrowserConfig, StaffBrowserOIDC
 
 
 class StrictModel(BaseModel):
@@ -147,7 +148,11 @@ def create_app(db_path: str | None = None) -> FastAPI:
     if staff_mode not in ('pilot','oidc'):
         raise ValueError('CHEMFORGE_STAFF_AUTH must be pilot or oidc')
     oidc=OIDCConfiguration.from_environment(os.environ) if staff_mode=='oidc' else None
+    browser_setting=os.environ.get('CHEMFORGE_OIDC_BROWSER','disabled').strip().lower()
+    if browser_setting not in ('disabled','enabled') or (browser_setting=='enabled' and staff_mode!='oidc'):
+        raise ValueError('OIDC browser login requires explicit OIDC staff mode')
     db = Database(db_path or os.environ.get('CHEMFORGE_CONTROL_DB','control.sqlite'))
+    browser=StaffBrowserOIDC(db,oidc,BrowserConfig.from_environment(os.environ,oidc)) if browser_setting=='enabled' else None
     app = FastAPI(title='CHEMFORGE Control',version='0.4.0',
                   description='Tenant-isolated administrative pilot; imported marks are unverified.')
 
@@ -180,7 +185,36 @@ def create_app(db_path: str | None = None) -> FastAPI:
         return FileResponse(dashboard_dir / 'styles.css', media_type='text/css',
                             headers=dashboard_headers)
 
-    def actor(authorization: Annotated[str | None, Header()] = None):
+    @app.get('/auth/capabilities',include_in_schema=False)
+    def auth_capabilities():
+        from fastapi.responses import JSONResponse
+        return JSONResponse({'mode':'oidc_browser' if browser else ('oidc_bearer' if staff_mode=='oidc' else 'pilot_bearer')},
+                            headers={'Cache-Control':'no-store'})
+
+    if browser is not None:
+        @app.get('/auth/start',include_in_schema=False)
+        def auth_start(request:Request):
+            return browser.start(request)
+
+        @app.get('/auth/callback',include_in_schema=False)
+        def auth_callback(request:Request,code:str='',state:str='',error:str=''):
+            return browser.callback(request,code,state,error)
+
+        @app.get('/auth/session',include_in_schema=False)
+        def auth_session(request:Request):
+            return browser.session(request)
+
+        @app.post('/auth/logout',include_in_schema=False)
+        def auth_logout(request:Request):
+            return browser.logout(request)
+
+    def actor(request:Request, authorization: Annotated[str | None, Header()] = None):
+        if browser is not None:
+            # Interactive staff mode accepts only server-side sessions. Never
+            # accept injected bearer access tokens or legacy pilot credentials.
+            if authorization:
+                raise HTTPException(401,'Staff browser session required')
+            return browser.actor(request)
         if not authorization or not authorization.startswith('Bearer '):
             raise HTTPException(401,'Valid Bearer token required',headers={'WWW-Authenticate':'Bearer'})
         secret=authorization[7:]

@@ -1,6 +1,8 @@
-# CHEMFORGE Enterprise Android and Control Plane (v2.0-alpha identity pilot)
+# CHEMFORGE Enterprise Android and Control Plane (v2.1 synthetic hardening candidate)
 
 **CHEMFORGE Student** has a default offline-only Android build and a separate opt-in connected QA variant for experimental A-Level Chemistry revision. **CHEMFORGE Control** is a separate connected institutional administration service, now with a same-origin browser dashboard. Automatic synchronisation remains unavailable. The connected variant adds a **manual**, explicit-consent, HTTPS upload to the existing student-scoped gateway; the default APK retains **no INTERNET permission**.
+
+See [`docs/RELEASE_v2.1.md`](docs/RELEASE_v2.1.md) and [`docs/VERIFICATION_v2.1.md`](docs/VERIFICATION_v2.1.md) for the opt-in server-side browser PKCE flow, permission regressions and explicit production blockers. **No real IdP or staging deployment is configured.**
 
 ## Current entry points
 

@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 import re
+import os
 import secrets
 import sqlite3
 from uuid import uuid4
@@ -52,6 +53,28 @@ CREATE TABLE IF NOT EXISTS oidc_actor_links (
   PRIMARY KEY (issuer, subject)
 );
 CREATE INDEX IF NOT EXISTS idx_oidc_actor_links ON oidc_actor_links(tenant_id,actor_id);
+
+-- Pilot-only, process-local SQLite session state; not a PostgreSQL migration.
+CREATE TABLE IF NOT EXISTS oidc_auth_flows (
+  state_hash TEXT PRIMARY KEY,
+  binding_hash TEXT NOT NULL,
+  code_verifier TEXT NOT NULL,
+  nonce TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_oidc_auth_expires ON oidc_auth_flows(expires_at);
+CREATE TABLE IF NOT EXISTS oidc_browser_sessions (
+  session_hash TEXT PRIMARY KEY,
+  actor_id TEXT NOT NULL REFERENCES actors(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  issuer TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  csrf_token TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_oidc_session_expires ON oidc_browser_sessions(expires_at);
+
 
 CREATE TABLE IF NOT EXISTS teacher_cohorts (
   tenant_id TEXT NOT NULL,
@@ -135,6 +158,14 @@ class Database:
     def __init__(self, path: str):
         self.path = str(Path(path).resolve())
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+        # Newly created DB files are owner-only even under permissive process umask.
+        # Existing files require an operator review before serving real data.
+        if not Path(self.path).exists():
+            try:
+                fd=os.open(self.path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+                os.close(fd)
+            except FileExistsError:
+                pass
         with self.connect() as cx:
             cx.execute('PRAGMA journal_mode=WAL')
             cx.executescript(SCHEMA)
