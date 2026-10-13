@@ -223,3 +223,91 @@ def test_provider_mfa_is_required_and_bad_discovery_rejected(oidc_env,monkeypatc
     path=tmp_path/'bad.json';path.write_text(json.dumps(metadata))
     monkeypatch.setenv('CHEMFORGE_OIDC_DISCOVERY_FILE',str(path))
     with pytest.raises(ValueError):create_app(str(tmp_path/'bad-db.sqlite'))
+
+
+def test_malformed_id_token_typ_is_denied_not_internal_error(oidc_env,monkeypatch):
+    """A signed ID-token header with non-string typ must fail closed with HTTP 401."""
+    from control_plane import browser_oidc
+    cfg=oidc_env
+    with TestClient(cfg['app'],base_url=BASE) as c:
+        q=start(c)
+        with cfg['db'].connect() as cx:
+            nonce=cx.execute('SELECT nonce FROM oidc_auth_flows').fetchone()['nonce']
+        raw=token(cfg['key'],nonce=nonce,id_token=True)
+        claims=jwt.decode(raw,cfg['key'].public_key(),algorithms=['RS256'],audience=CLIENT,issuer=ISSUER)
+        malformed=jwt.encode(claims,cfg['key'],algorithm='RS256',
+                             headers={'kid':'synthetic-test-key','typ': 42})
+        assert jwt.get_unverified_header(malformed)['typ']==42
+        monkeypatch.setattr(browser_oidc.StaffBrowserOIDC,'_exchange',
+                            lambda self,code,verifier: {'id_token':malformed,'access_token':token(cfg['key'])})
+        response=c.get('/auth/callback',params={'code':'synthetic','state':q['state'][0]},follow_redirects=False)
+        assert response.status_code==401
+        assert c.get('/auth/session').status_code==401
+
+
+def test_optional_id_token_at_hash_must_bind_exchanged_access_token(oidc_env,monkeypatch):
+    """Do not accept a provider ID token with a mismatched at_hash."""
+    from control_plane import browser_oidc
+    cfg=oidc_env
+    with TestClient(cfg['app'],base_url=BASE) as c:
+        q=start(c)
+        with cfg['db'].connect() as cx:
+            nonce=cx.execute('SELECT nonce FROM oidc_auth_flows').fetchone()['nonce']
+        raw=token(cfg['key'],nonce=nonce,id_token=True)
+        claims=jwt.decode(raw,cfg['key'].public_key(),algorithms=['RS256'],audience=CLIENT,issuer=ISSUER)
+        claims['at_hash']='attacker-supplied-mismatch'
+        signed=jwt.encode(claims,cfg['key'],algorithm='RS256',headers={'kid':'synthetic-test-key','typ':'JWT'})
+        monkeypatch.setattr(browser_oidc.StaffBrowserOIDC,'_exchange',
+                            lambda self,code,verifier: {'id_token':signed,'access_token':token(cfg['key'])})
+        response=c.get('/auth/callback',params={'code':'synthetic','state':q['state'][0]},follow_redirects=False)
+        assert response.status_code==401
+        assert c.get('/v1/me').status_code==401
+
+
+def test_browser_api_rejects_spoofed_host_even_with_valid_cookie(oidc_env,monkeypatch):
+    """Cookie authorization must be scoped to the configured external HTTPS origin."""
+    from control_plane.browser_oidc import SESSION_COOKIE
+    cfg=oidc_env
+    with TestClient(cfg['app'],base_url=BASE) as c:
+        authenticate(c,cfg,monkeypatch)
+        assert c.get('/v1/me').status_code==200
+        value=c.cookies.get(SESSION_COOKIE)
+        response=c.get('/v1/me',headers={'host':'evil.example.invalid',
+                                           'cookie':f'{SESSION_COOKIE}={value}'})
+        assert response.status_code==403
+
+
+def test_valid_optional_at_hash_allows_matching_access_token(oidc_env,monkeypatch):
+    """The optional OIDC at_hash path accepts correctly bound synthetic tokens."""
+    from control_plane import browser_oidc
+    cfg=oidc_env
+    with TestClient(cfg['app'],base_url=BASE) as c:
+        q=start(c)
+        with cfg['db'].connect() as cx:
+            nonce=cx.execute('SELECT nonce FROM oidc_auth_flows').fetchone()['nonce']
+        access=token(cfg['key'])
+        raw=token(cfg['key'],nonce=nonce,id_token=True)
+        claims=jwt.decode(raw,cfg['key'].public_key(),algorithms=['RS256'],audience=CLIENT,issuer=ISSUER)
+        claims['at_hash']=base64.urlsafe_b64encode(sha256(access.encode('ascii')).digest()[:16]).rstrip(b'=').decode()
+        signed=jwt.encode(claims,cfg['key'],algorithm='RS256',headers={'kid':'synthetic-test-key','typ':'JWT'})
+        monkeypatch.setattr(browser_oidc.StaffBrowserOIDC,'_exchange',
+                            lambda self,code,verifier: {'id_token':signed,'access_token':access})
+        assert c.get('/auth/callback',params={'code':'synthetic','state':q['state'][0]},follow_redirects=False).status_code==303
+        assert c.get('/v1/me').status_code==200
+
+
+def test_non_ascii_access_token_is_denied_without_internal_error(oidc_env,monkeypatch):
+    """Malformed provider token bodies must never cause Unicode error 500s."""
+    from control_plane import browser_oidc
+    cfg=oidc_env
+    with TestClient(cfg['app'],base_url=BASE) as c:
+        q=start(c)
+        with cfg['db'].connect() as cx:
+            nonce=cx.execute('SELECT nonce FROM oidc_auth_flows').fetchone()['nonce']
+        raw=token(cfg['key'],nonce=nonce,id_token=True)
+        claims=jwt.decode(raw,cfg['key'].public_key(),algorithms=['RS256'],audience=CLIENT,issuer=ISSUER)
+        claims['at_hash']='attacker-supplied-mismatch'
+        signed=jwt.encode(claims,cfg['key'],algorithm='RS256',headers={'kid':'synthetic-test-key'})
+        monkeypatch.setattr(browser_oidc.StaffBrowserOIDC,'_exchange',
+                            lambda self,code,verifier: {'id_token':signed,'access_token':'●'})
+        assert c.get('/auth/callback',params={'code':'synthetic','state':q['state'][0]},follow_redirects=False).status_code==401

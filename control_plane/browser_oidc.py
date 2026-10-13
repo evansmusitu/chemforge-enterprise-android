@@ -153,14 +153,15 @@ class StaffBrowserOIDC:
         except (httpx.HTTPError, ValueError, TypeError, KeyError) as exc:
             raise HTTPException(401,'Identity provider authorization failed') from exc
 
-    def _verify_id_token(self, token, nonce):
+    def _verify_id_token(self, token, nonce, access_token):
         if not isinstance(token,str) or len(token)>12000:
             raise HTTPException(401,'OIDC ID token rejected')
         try:
             header=jwt.get_unverified_header(token)
             kid=header.get('kid')
+            typ=header.get('typ','JWT')
             if (header.get('alg')!='RS256' or not isinstance(kid,str) or kid not in self.oidc.keys
-                    or header.get('crit') or header.get('typ','JWT').lower()!='jwt'):
+                    or header.get('crit') or not isinstance(typ,str) or typ.lower()!='jwt'):
                 raise ValueError('ID token header')
             body=jwt.decode(token,self.oidc.keys[kid],algorithms=['RS256'],
                     issuer=self.config.issuer,audience=self.config.client_id,
@@ -168,6 +169,13 @@ class StaffBrowserOIDC:
             if (not isinstance(body.get('sub'),str) or not 1<=len(body['sub'])<=255
                     or not secrets.compare_digest(str(body.get('nonce','')),nonce)):
                 raise ValueError('ID token nonce or subject')
+            if 'at_hash' in body:
+                # Optional in OIDC code flow; mandatory to verify if the issuer includes it.
+                expected=base64.urlsafe_b64encode(sha256(access_token.encode('ascii')).digest()[:16]).rstrip(b'=').decode('ascii')
+                at_hash=body['at_hash']
+                if (not isinstance(at_hash,str) or not re.fullmatch(r'[A-Za-z0-9_-]{22}',at_hash)
+                        or not secrets.compare_digest(at_hash,expected)):
+                    raise ValueError('OIDC ID token access-token hash mismatch')
             return body['sub']
         except (jwt.PyJWTError,ValueError,KeyError,TypeError) as exc:
             raise HTTPException(401,'OIDC ID token rejected') from exc
@@ -178,7 +186,7 @@ class StaffBrowserOIDC:
             raise HTTPException(401,'Identity provider authorization was not granted')
         flow=self._consume(state,request.cookies.get(BIND_COOKIE,''))
         body=self._exchange(code,flow['code_verifier'])
-        sub=self._verify_id_token(body['id_token'],flow['nonce'])
+        sub=self._verify_id_token(body['id_token'],flow['nonce'],body['access_token'])
         try:
             claims=self.oidc.verify_claims(body['access_token'])
             if (not secrets.compare_digest(sub,claims['sub']) or
@@ -211,6 +219,7 @@ class StaffBrowserOIDC:
         return self._no_store(response)
 
     def _lookup(self, request, check_csrf=False):
+        self._require_origin(request)
         session=request.cookies.get(SESSION_COOKIE,'')
         if not isinstance(session,str) or not 10<len(session)<256:
             raise HTTPException(401,'Staff session required')
