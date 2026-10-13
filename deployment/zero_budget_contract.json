@@ -1,0 +1,15 @@
+{
+  "schema": "chemforge.zero_budget.synthetic_staging.v1",
+  "environment": "synthetic-staging-only",
+  "max_monthly_spend_usd": 0,
+  "real_student_data_allowed": false,
+  "public_api_enabled": false,
+  "provider_deploy_enabled": false,
+  "real_oidc_verified": false,
+  "reuse_nexus_credentials_or_data": false,
+  "github_plane": "Public GitHub Actions for source verification only",
+  "public_static": "GitHub Pages read-only project information (optional)",
+  "cloudflare_edge": "Cloudflare Workers Free (optional)",
+  "python_runtime": "Modal Starter (only with verified $0 spend controls)",
+  "postgres": "Dedicated Neon Free PostgreSQL (not provisioned)"
+}

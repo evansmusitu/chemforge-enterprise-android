@@ -1,0 +1,40 @@
+name: CHEMFORGE $0 non-deployment plan guard
+on:
+  push:
+    paths:
+      - 'deployment/zero_budget_contract.json'
+      - 'docs/ZERO_DOLLAR_DEPLOYMENT_DECISION.md'
+      - 'tools/zero_budget_gate.py'
+      - 'tests/deployment/test_zero_budget_gate.py'
+      - '.github/workflows/zero-budget-plan-guard.yml'
+  pull_request:
+    paths:
+      - 'deployment/zero_budget_contract.json'
+      - 'docs/ZERO_DOLLAR_DEPLOYMENT_DECISION.md'
+      - 'tools/zero_budget_gate.py'
+      - 'tests/deployment/test_zero_budget_gate.py'
+      - '.github/workflows/zero-budget-plan-guard.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-plan-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run $0 synthetic-only plan regression tests
+        run: python -m unittest discover -s tests/deployment -p 'test_*.py' -v
+      - name: Check fail-closed $0 contract
+        run: python tools/zero_budget_gate.py --contract deployment/zero_budget_contract.json
+      - name: Verify deployment attempt remains blocked
+        shell: bash
+        run: |
+          if python tools/zero_budget_gate.py --request-deploy > /tmp/deploy-gate-result.txt; then
+            echo 'ERROR: provider deployment was unexpectedly allowed' >&2
+            exit 1
+          fi
+          grep -q 'BLOCKED' /tmp/deploy-gate-result.txt
