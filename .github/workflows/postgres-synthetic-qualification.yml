@@ -1,0 +1,47 @@
+name: CHEMFORGE disposable PostgreSQL security qualification
+on:
+  push:
+    paths:
+      - 'control_plane/**'
+      - 'tests/postgresql/**'
+      - '.github/workflows/postgres-synthetic-qualification.yml'
+  pull_request:
+    paths:
+      - 'control_plane/**'
+      - 'tests/postgresql/**'
+      - '.github/workflows/postgres-synthetic-qualification.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-pg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: chemforge_synthetic
+          POSTGRES_PASSWORD: synthetic_ci_only_not_a_real_secret
+          POSTGRES_DB: chemforge_synthetic
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chemforge_synthetic -d chemforge_synthetic"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      CHEMFORGE_STORAGE_BACKEND: postgres_synthetic
+      CHEMFORGE_POSTGRES_SYNTHETIC_ONLY: I_ACKNOWLEDGE_DISPOSABLE_SYNTHETIC_DATABASE_ONLY
+      CHEMFORGE_PG_DSN: postgresql://chemforge_synthetic:synthetic_ci_only_not_a_real_secret@127.0.0.1:5432/chemforge_synthetic?sslmode=disable
+      CHEMFORGE_PG_CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install CI-only Postgres adapter dependencies
+        run: python -m pip install -r control_plane/requirements.txt 'psycopg[binary]>=3.2,<4' 'pytest>=8,<10'
+      - name: Confirm safe backend configuration and disposable database permission regressions
+        run: python -m pytest -q tests/postgresql
+      - name: Check prohibited public/real-data deployment contract remains disabled
+        run: python tools/zero_budget_gate.py --contract deployment/zero_budget_contract.json

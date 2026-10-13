@@ -151,7 +151,19 @@ def create_app(db_path: str | None = None) -> FastAPI:
     browser_setting=os.environ.get('CHEMFORGE_OIDC_BROWSER','disabled').strip().lower()
     if browser_setting not in ('disabled','enabled') or (browser_setting=='enabled' and staff_mode!='oidc'):
         raise ValueError('OIDC browser login requires explicit OIDC staff mode')
-    db = Database(db_path or os.environ.get('CHEMFORGE_CONTROL_DB','control.sqlite'))
+    storage = os.environ.get('CHEMFORGE_STORAGE_BACKEND', 'sqlite_pilot')
+    if storage == 'sqlite_pilot':
+        db = Database(db_path or os.environ.get('CHEMFORGE_CONTROL_DB', 'control.sqlite'))
+    elif storage == 'postgres_synthetic':
+        # Never silently use a SQLite path when a PostgreSQL instance is selected.
+        if db_path is not None:
+            from .postgres_synthetic import validate_configuration
+            validate_configuration(os.environ)  # Fail closed before touching disk.
+            raise ValueError('Postgres synthetic mode does not accept db_path')
+        from .postgres_synthetic import PostgresSyntheticDatabase
+        db = PostgresSyntheticDatabase(os.environ)
+    else:
+        raise ValueError('Unsupported storage backend (sqlite_pilot or postgres_synthetic only)')
     browser=StaffBrowserOIDC(db,oidc,BrowserConfig.from_environment(os.environ,oidc)) if browser_setting=='enabled' else None
     app = FastAPI(title='CHEMFORGE Control',version='0.4.0',
                   description='Tenant-isolated administrative pilot; imported marks are unverified.')
