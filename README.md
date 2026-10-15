@@ -53,3 +53,10 @@ revocation, expiration and student/tenant binding before inserting any unverifie
 evidence. See docs/DEVICE_REAUTH_ATOMICITY_v2.5.md.
 This is synthetic qualification only: no public backend, no hosted Postgres,
 no real student data and no paid deployment.
+
+## v2.6: bounded synthetic staff sign-in state
+
+The opt-in staff PKCE login start now prunes expired server flows and sessions
+and caps outstanding flows at 256; exhaustion returns no-store HTTP 429.
+See docs/OIDC_STATE_RESOURCE_LIMIT_v2.6.md. This is not a public or
+provider-verified SSO rollout; production deployment remains blocked.

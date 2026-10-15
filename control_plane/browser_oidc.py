@@ -28,6 +28,8 @@ SESSION_COOKIE = '__Host-cf_staff'
 BIND_COOKIE = '__Host-cf_oidc_bind'
 FLOW_SECONDS = 300
 SESSION_SECONDS = 900
+# Last-resort bounded state for the $0 synthetic pilot; not an IP rate limiter.
+MAX_ACTIVE_FLOWS = 256
 
 
 def _origin(url):
@@ -110,9 +112,18 @@ class StaffBrowserOIDC:
         expire=(datetime.now(timezone.utc)+timedelta(seconds=FLOW_SECONDS)).isoformat()
         with self.db.connect() as cx:
             cx.execute('BEGIN IMMEDIATE')
-            cx.execute('DELETE FROM oidc_auth_flows WHERE expires_at < ?', (utcnow(),))
-            cx.execute('''INSERT INTO oidc_auth_flows(state_hash,binding_hash,code_verifier,nonce,expires_at)
-                          VALUES(?,?,?,?,?)''',(token_digest(state),token_digest(binding),verifier,nonce,expire))
+            now = utcnow()
+            cx.execute('DELETE FROM oidc_auth_flows WHERE expires_at <= ?', (now,))
+            cx.execute('DELETE FROM oidc_browser_sessions WHERE expires_at <= ?', (now,))
+            active = cx.execute('SELECT COUNT(*) FROM oidc_auth_flows').fetchone()[0]
+            if active < MAX_ACTIVE_FLOWS:
+                cx.execute('''INSERT INTO oidc_auth_flows(state_hash,binding_hash,code_verifier,nonce,expires_at)
+                              VALUES(?,?,?,?,?)''',(token_digest(state),token_digest(binding),verifier,nonce,expire))
+        # Leave the transaction successfully so expiry cleanup persists even
+        # when new login capacity has been exhausted.
+        if active >= MAX_ACTIVE_FLOWS:
+            raise HTTPException(429, 'Login temporarily unavailable',
+                headers={'Retry-After': str(FLOW_SECONDS), 'Cache-Control': 'no-store'})
         url=self.config.authorize+'?'+urlencode({'response_type':'code','client_id':self.config.client_id,
             'redirect_uri':self.config.redirect_uri,'scope':'openid','state':state,
             'code_challenge_method':'S256','code_challenge':challenge,'nonce':nonce})
