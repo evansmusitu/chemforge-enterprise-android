@@ -12,6 +12,7 @@ import pytest
 if os.getenv('CHEMFORGE_PG_CI') != '1':
     pytest.skip('Dedicated synthetic PostgreSQL container is not configured',allow_module_level=True)
 
+from fastapi import Request
 from fastapi.testclient import TestClient
 from control_plane.app import create_app
 from control_plane.postgres_synthetic import (
@@ -147,7 +148,7 @@ def test_postgres_device_upload_rechecks_authority_after_dependency(pg,change):
 
 def test_postgres_oidc_flow_capacity_and_expiry_cleanup(pg, monkeypatch):
     """Real dict_row PostgreSQL cursor honors OIDC flow capacity; no IdP contact."""
-    from fastapi import FastAPI, Request
+    from fastapi import FastAPI
     from control_plane import browser_oidc
     from control_plane.browser_oidc import BrowserConfig, StaffBrowserOIDC
     from urllib.parse import urlsplit, parse_qs
