@@ -143,3 +143,37 @@ def test_postgres_device_upload_rechecks_authority_after_dependency(pg,change):
                               (tenant,attempt)).fetchone()['n']==0
             assert cx.execute('SELECT COUNT(*) AS n FROM audit WHERE tenant_id=? AND action=?',
                               (tenant,'backup.imported')).fetchone()['n']==0
+
+
+def test_postgres_oidc_flow_capacity_and_expiry_cleanup(pg, monkeypatch):
+    """Real dict_row PostgreSQL cursor honors OIDC flow capacity; no IdP contact."""
+    from fastapi import FastAPI, Request
+    from control_plane import browser_oidc
+    from control_plane.browser_oidc import BrowserConfig, StaffBrowserOIDC
+    from urllib.parse import urlsplit, parse_qs
+    from control_plane.db import token_digest
+
+    monkeypatch.setattr(browser_oidc, 'MAX_ACTIVE_FLOWS', 1)
+    base = 'https://control.example.invalid'
+    issuer = 'https://login.example.invalid/realm'
+    cfg = BrowserConfig(issuer, 'chemforge-synthetic-browser',
+        base + '/auth/callback', base, issuer + '/authorize', issuer + '/token')
+    staff = StaffBrowserOIDC(pg, None, cfg)
+    app = FastAPI()
+
+    @app.get('/auth/start')
+    def login(request: Request):
+        return staff.start(request)
+
+    # Isolate this test from any previous synthetic flow fixture in this module.
+    with pg.connect() as cx:
+        cx.execute('DELETE FROM oidc_auth_flows')
+    with TestClient(app, base_url=base) as client:
+        first = client.get('/auth/start', follow_redirects=False)
+        assert first.status_code == 302
+        assert client.get('/auth/start', follow_redirects=False).status_code == 429
+        state = parse_qs(urlsplit(first.headers['location']).query)['state'][0]
+        with pg.connect() as cx:
+            cx.execute('UPDATE oidc_auth_flows SET expires_at=? WHERE state_hash=?',
+                       ('2020-01-01T00:00:00+00:00', token_digest(state)))
+        assert client.get('/auth/start', follow_redirects=False).status_code == 302

@@ -64,3 +64,48 @@ def test_429_still_commits_expired_session_cleanup(oidc_env, monkeypatch):
         assert client.get('/auth/start', follow_redirects=False).status_code == 429
     with oidc_env['db'].connect() as cx:
         assert cx.execute('SELECT COUNT(*) FROM oidc_browser_sessions').fetchone()[0] == 0
+
+
+def test_flow_counter_accepts_postgresql_dict_row_shape(oidc_env):
+    """Postgres adapter returns dictionaries, not tuple/SQLite rows."""
+    from contextlib import contextmanager
+    from fastapi import FastAPI, Request
+    from control_plane.browser_oidc import BrowserConfig, StaffBrowserOIDC
+
+    class MappingCountCursor:
+        def __init__(self, native):
+            self.native = native
+
+        def fetchone(self):
+            return {'active_flows': self.native.fetchone()[0]}
+
+    class DictRowCursor:
+        def __init__(self, native):
+            self.native = native
+
+        def execute(self, sql, params=()):
+            result = self.native.execute(sql, params)
+            if 'COUNT(*) AS active_flows FROM oidc_auth_flows' in sql:
+                return MappingCountCursor(result)
+            return result
+
+    class DictRowDatabase:
+        @contextmanager
+        def connect(self):
+            with oidc_env['db'].connect() as cx:
+                yield DictRowCursor(cx)
+
+    cfg = BrowserConfig(issuer='https://login.example.invalid/realm',
+        client_id='chemforge-staff-web', redirect_uri=BASE + '/auth/callback',
+        origin=BASE, authorize='https://login.example.invalid/realm/authorize',
+        token='https://login.example.invalid/realm/token')
+    staff = StaffBrowserOIDC(DictRowDatabase(), None, cfg)
+    app = FastAPI()
+
+    @app.get('/auth/start')
+    def login(request: Request):
+        return staff.start(request)
+
+    with TestClient(app, base_url=BASE) as client:
+        response = client.get('/auth/start', follow_redirects=False)
+        assert response.status_code == 302

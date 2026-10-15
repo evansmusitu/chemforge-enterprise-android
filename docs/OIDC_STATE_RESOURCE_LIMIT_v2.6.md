@@ -44,3 +44,15 @@ This change does not enable deployment. The dedicated PostgreSQL synthetic-only
 adapter still rejects remote database hosts; the zero-dollar deployment
 contract remains unchanged and forbids public API/data admission and
 reuse of MUSITU Education Nexus credentials, data or hosting.
+
+
+## PostgreSQL dictionary-row compatibility repair
+
+Follow-up verification identified that psycopg's dictionary row representation
+cannot be indexed by integer zero. The count query now returns a named
+`active_flows` column, read by column name in both SQLite and PostgreSQL.
+A deterministic mapping-row regression was observed failing with `KeyError: 0`
+before the fix, and green afterward. An additional true PostgreSQL 17 test
+checks login-flow capacity and expired-slot recovery inside the existing
+synthetic service-container pipeline; do not count it as verified until that
+CI workflow succeeds on the repair commit.

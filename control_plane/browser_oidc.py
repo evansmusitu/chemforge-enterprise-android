@@ -115,7 +115,7 @@ class StaffBrowserOIDC:
             now = utcnow()
             cx.execute('DELETE FROM oidc_auth_flows WHERE expires_at <= ?', (now,))
             cx.execute('DELETE FROM oidc_browser_sessions WHERE expires_at <= ?', (now,))
-            active = cx.execute('SELECT COUNT(*) FROM oidc_auth_flows').fetchone()[0]
+            active = cx.execute('SELECT COUNT(*) AS active_flows FROM oidc_auth_flows').fetchone()['active_flows']
             if active < MAX_ACTIVE_FLOWS:
                 cx.execute('''INSERT INTO oidc_auth_flows(state_hash,binding_hash,code_verifier,nonce,expires_at)
                               VALUES(?,?,?,?,?)''',(token_digest(state),token_digest(binding),verifier,nonce,expire))
