@@ -23,7 +23,7 @@ EXPECTED = {
     "public_static": "GitHub Pages read-only project information (optional)",
     "cloudflare_edge": "Cloudflare Workers Free (optional)",
     "python_runtime": "Modal Starter (only with verified $0 spend controls)",
-    "postgres": "Dedicated Neon Free PostgreSQL (not provisioned)",
+    "postgres": "Dedicated Neon Free PostgreSQL (empty, publicly blocked; no API/runtime)",
 }
 
 

@@ -1,0 +1,22 @@
+{
+  "schema": "chemforge.neon.synthetic_staging_attestation.v1",
+  "observed_on_utc": "2026-10-16",
+  "provider": "Neon",
+  "plan": "free_v3",
+  "org_id": "org-frosty-morning-97872293",
+  "project_id": "delicate-haze-29026531",
+  "project_name": "CHEMFORGE Synthetic Staging - No Student Data",
+  "branch_id": "br-wandering-boat-b5o4f2ty",
+  "branch_name": "synthetic-staging",
+  "database_name": "chemforge_synthetic",
+  "role_name": "chemforge_synthetic",
+  "region_id": "aws-us-east-2",
+  "pg_version": 17,
+  "public_connections_blocked": true,
+  "observed_public_table_count": 0,
+  "autoscaling_limit_max_cu": 0.25,
+  "real_student_data_allowed": false,
+  "public_api_enabled": false,
+  "runtime_deployment_enabled": false,
+  "secret_values_present": false
+}

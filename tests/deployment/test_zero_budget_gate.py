@@ -51,7 +51,7 @@ class BudgetContractTests(unittest.TestCase):
     def test_stack_is_architecture_only(self):
         self.assertEqual("Cloudflare Workers Free (optional)", self.contract["cloudflare_edge"])
         self.assertEqual("Modal Starter (only with verified $0 spend controls)", self.contract["python_runtime"])
-        self.assertEqual("Dedicated Neon Free PostgreSQL (not provisioned)", self.contract["postgres"])
+        self.assertEqual("Dedicated Neon Free PostgreSQL (empty, publicly blocked; no API/runtime)", self.contract["postgres"])
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # CHEMFORGE — strict $0 staging architecture decision (2026-10-13)
 
-**Decision status: non-deployed engineering blueprint only. Not production-approved.**
+**Decision status (updated 2026-10-16): an empty dedicated Neon Free project exists and has external connections blocked. The backend and public API remain non-deployed and NOT production-approved.**
 **Budget:** $0 cash per month, **no automatic paid upgrades or overage exposure**.
 
 ## Reference pattern inspected
@@ -11,12 +11,12 @@ MUSITU Education Nexus (not CHEMFORGE) has a GitHub Actions orchestration, Cloud
 
 1. **Today:** Keep CHEMFORGE Android's default APK fully offline. Keep the connected QA variant disabled outside synthetic CI. Use the current GitHub public repository and existing no-cost Actions checks for source and synthetic-device testing. This is the sole currently qualified deployment-related execution path.
 2. **Optional public information page:** GitHub Pages can host *read-only*, reviewed documentation with no logins, student data, backend calls, cookies or exam-certification claims. Pages **cannot** host FastAPI/Postgres. Do not publish an admin dashboard or claim a live service.
-3. **Optional private staging, after specific evidence:** Cloudflare Workers **Free** edge → isolated Modal Starter Python ASGI instance → a **new dedicated** Neon Free PostgreSQL project; deploy only after confirming zero-pay spend controls and separately qualifying a PostgreSQL adapter, migrations, restore procedure, HTTPS-proxy/canonical-origin behavior, rate limiting, and OIDC provider integration. Begin with synthetic-only records and restricted access. Until proven, the provider plan remains NOT provisioned and NOT enabled.
+3. **Optional private staging, after specific evidence:** Cloudflare Workers **Free** edge → isolated Modal Starter Python ASGI instance → a **new dedicated** Neon Free PostgreSQL project; deploy only after confirming zero-pay spend controls and separately qualifying a PostgreSQL adapter, migrations, restore procedure, HTTPS-proxy/canonical-origin behavior, rate limiting, and OIDC provider integration. Begin with synthetic-only records and restricted access. The Neon project has been allocated free, publicly blocked and verified empty (see NEON_SYNTHETIC_STAGING_v2.7.md). Cloudflare and Modal runtimes remain NOT deployed or enabled; no remotely accessible app is qualified.
 4. **If any service demands payment/card/overages:** stop. Do not silently switch to a paid plan or assume promotional credits guarantee a $0 bill. Modal's $30 compute allowance is a credit, not a hard $0 invoice guarantee; usage or other services can cost money.
 
 ## Why nothing live was deployed
 
-CHEMFORGE Control is currently **SQLite-backed**, with SQL and sessions bound to its local pilot database. Modal's scale-to-zero/restart model does not provide SQLite durability. A Neon connection is **not** a drop-in substitute; the schema, transactions, OIDC/browser sessions, tenants, migrations, backups and authorization checks must be ported and independently tested. Cloudflare Workers cannot directly run the current Python FastAPI/SQLite implementation. The staff OIDC flow has only synthetic IdP verification and is not provider-configured. Public exposure of this server is not authorized. No real student, institution, or teacher credentials can enter this environment.
+CHEMFORGE Control is currently **SQLite-backed**, with SQL and sessions bound to its local pilot database. Modal's scale-to-zero/restart model does not provide SQLite durability. Neon Free was reserved and deliberately locked; it is not yet connected to the app. A Neon connection is **not** a drop-in substitute; the schema, transactions, OIDC/browser sessions, tenants, migrations, backups and authorization checks must be ported and independently tested. Cloudflare Workers cannot directly run the current Python FastAPI/SQLite implementation. The staff OIDC flow has only synthetic IdP verification and is not provider-configured. Public exposure of this server is not authorized. No real student, institution, or teacher credentials can enter this environment.
 
 ## Required checks before a provider deployment
 

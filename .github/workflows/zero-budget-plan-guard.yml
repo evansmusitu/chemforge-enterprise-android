@@ -3,16 +3,24 @@ on:
   push:
     paths:
       - 'deployment/zero_budget_contract.json'
+      - 'deployment/neon_synthetic_staging_evidence_v27.json'
       - 'docs/ZERO_DOLLAR_DEPLOYMENT_DECISION.md'
+      - 'docs/NEON_SYNTHETIC_STAGING_v2.7.md'
       - 'tools/zero_budget_gate.py'
+      - 'tools/neon_staging_gate.py'
       - 'tests/deployment/test_zero_budget_gate.py'
+      - 'tests/deployment/test_neon_staging_v27.py'
       - '.github/workflows/zero-budget-plan-guard.yml'
   pull_request:
     paths:
       - 'deployment/zero_budget_contract.json'
+      - 'deployment/neon_synthetic_staging_evidence_v27.json'
       - 'docs/ZERO_DOLLAR_DEPLOYMENT_DECISION.md'
+      - 'docs/NEON_SYNTHETIC_STAGING_v2.7.md'
       - 'tools/zero_budget_gate.py'
+      - 'tools/neon_staging_gate.py'
       - 'tests/deployment/test_zero_budget_gate.py'
+      - 'tests/deployment/test_neon_staging_v27.py'
       - '.github/workflows/zero-budget-plan-guard.yml'
   workflow_dispatch:
 permissions:
@@ -26,8 +34,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run $0 synthetic-only plan regression tests
-        run: python -m unittest discover -s tests/deployment -p 'test_*.py' -v
+      - name: Install pinned testing dependency
+        run: python -m pip install 'pytest==9.0.2'
+      - name: Run $0 synthetic-only plan regressions
+        run: python -m pytest -q tests/deployment
+      - name: Validate historical locked Neon attestation (offline)
+        run: python tools/neon_staging_gate.py --evidence deployment/neon_synthetic_staging_evidence_v27.json
       - name: Check fail-closed $0 contract
         run: python tools/zero_budget_gate.py --contract deployment/zero_budget_contract.json
       - name: Verify deployment attempt remains blocked

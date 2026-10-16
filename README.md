@@ -60,3 +60,12 @@ The opt-in staff PKCE login start now prunes expired server flows and sessions
 and caps outstanding flows at 256; exhaustion returns no-store HTTP 429.
 See docs/OIDC_STATE_RESOURCE_LIMIT_v2.6.md. This is not a public or
 provider-verified SSO rollout; production deployment remains blocked.
+
+## v2.7: provisioned, locked Neon Free staging resource
+
+A dedicated CHEMFORGE PostgreSQL 17 project was allocated on the existing
+Neon free organization; its public connections are blocked and the database
+was verified empty before blocking. No FastAPI process, migrations, credentials,
+student records or public API were deployed. The offline/CI-only attestation
+gate cannot authorize hosting or confirm ongoing provider settings. See
+`docs/NEON_SYNTHETIC_STAGING_v2.7.md`.
