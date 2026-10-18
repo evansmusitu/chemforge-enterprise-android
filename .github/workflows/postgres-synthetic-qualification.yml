@@ -5,12 +5,14 @@ on:
       - 'control_plane/**'
       - 'tests/postgresql/**'
       - 'tools/postgres_restore_drill.py'
+      - 'tools/postgres_role_gate.py'
       - '.github/workflows/postgres-synthetic-qualification.yml'
   pull_request:
     paths:
       - 'control_plane/**'
       - 'tests/postgresql/**'
       - 'tools/postgres_restore_drill.py'
+      - 'tools/postgres_role_gate.py'
       - '.github/workflows/postgres-synthetic-qualification.yml'
   workflow_dispatch:
 permissions:

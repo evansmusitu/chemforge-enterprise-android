@@ -77,3 +77,15 @@ connecting or exposing a password. The dedicated Neon Free project remains
 publicly blocked, no runtime can use its remote credentials, and the offline
 student APK and unverified evidence boundaries are unchanged.
 See [docs/NEON_TLS_PREFLIGHT_v2.8.md](docs/NEON_TLS_PREFLIGHT_v2.8.md).
+
+## v2.9: disposable PostgreSQL runtime-role privilege experiment
+
+A separate **NOLOGIN synthetic CI role** now models least-privilege runtime
+permissions: normal data tables are usable, but security audit history is
+append-only and the schema-version ledger is read-only. This is verified in the
+existing *disposable* PostgreSQL 17 test container, not the locked Neon project.
+The actual CI API still connects as a superuser and a live limited-login
+backend is not yet qualified. See `docs/POSTGRES_ROLE_LEAST_PRIVILEGE_v2.9.md`.
+
+The $0 budget, blocked public Neon access, explicit-consent connected QA,
+fully offline default APK, and no-real-student-data gates remain unchanged.

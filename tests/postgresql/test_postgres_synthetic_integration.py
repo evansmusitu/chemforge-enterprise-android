@@ -178,3 +178,57 @@ def test_postgres_oidc_flow_capacity_and_expiry_cleanup(pg, monkeypatch):
             cx.execute('UPDATE oidc_auth_flows SET expires_at=? WHERE state_hash=?',
                        ('2020-01-01T00:00:00+00:00', token_digest(state)))
         assert client.get('/auth/start', follow_redirects=False).status_code == 302
+
+
+def test_postgres_ci_runtime_role_is_least_privileged_and_audit_append_only(pg):
+    """Real disposable PostgreSQL17: runtime can read/write learning data,
+    never gain schema DDL or mutate audit history / migration records.
+    """
+    import psycopg
+    from tools.postgres_role_gate import apply_synthetic_role_gate
+
+    with pg.connect() as cx:
+        result = apply_synthetic_role_gate(os.environ, cx)
+        assert result['status'] == 'SYNTHETIC_ROLE_POLICY_CONFIGURED'
+
+    with pg.connect() as cx:
+        flags = cx.execute('''SELECT
+            (SELECT rolcanlogin FROM pg_roles WHERE rolname='chemforge_ci_runtime') AS can_login,
+            has_schema_privilege('chemforge_ci_runtime','public','USAGE') AS schema_usage,
+            has_schema_privilege('chemforge_ci_runtime','public','CREATE') AS schema_create,
+            has_table_privilege('chemforge_ci_runtime','public.students','SELECT') AS students_read,
+            has_table_privilege('chemforge_ci_runtime','public.students','INSERT') AS students_write,
+            has_table_privilege('chemforge_ci_runtime','public.audit','INSERT') AS audit_append,
+            has_table_privilege('chemforge_ci_runtime','public.audit','UPDATE') AS audit_edit,
+            has_table_privilege('chemforge_ci_runtime','public.audit','DELETE') AS audit_delete,
+            has_table_privilege('chemforge_ci_runtime','public.chemforge_schema_versions','SELECT') AS migration_read,
+            has_table_privilege('chemforge_ci_runtime','public.chemforge_schema_versions','UPDATE') AS migration_edit
+        ''').fetchone()
+        assert flags == {
+            'can_login': False,
+            'schema_usage': True,
+            'schema_create': False,
+            'students_read': True,
+            'students_write': True,
+            'audit_append': True,
+            'audit_edit': False,
+            'audit_delete': False,
+            'migration_read': True,
+            'migration_edit': False,
+        }
+
+    with pg.connect() as cx:
+        cx.execute('SET LOCAL ROLE chemforge_ci_runtime')
+        assert cx.execute('SELECT COUNT(*) AS total FROM students').fetchone()['total'] >= 0
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cx.execute('CREATE TABLE chemforge_ci_forbidden(tenant_id TEXT)')
+
+    with pg.connect() as cx:
+        cx.execute('SET LOCAL ROLE chemforge_ci_runtime')
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cx.execute("UPDATE audit SET action='forbidden' WHERE FALSE")
+
+    with pg.connect() as cx:
+        cx.execute('SET LOCAL ROLE chemforge_ci_runtime')
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            cx.execute("UPDATE chemforge_schema_versions SET sha256='forbidden' WHERE FALSE")
