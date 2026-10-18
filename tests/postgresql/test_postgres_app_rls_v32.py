@@ -19,6 +19,7 @@ from psycopg.rows import dict_row
 
 from control_plane.postgres_synthetic import validate_configuration
 from tools.postgres_app_rls_gate import APP_TABLES, BINDINGS, prepare_disposable_app_rls
+from tools.postgres_tenant_session_gate import TenantSessionRouter
 
 TS='2026-10-18T00:00:00+00:00'
 
@@ -118,6 +119,32 @@ def test_application_schema_all_tenant_tables_enforce_database_principal():
             with pytest.raises(psycopg.errors.InsufficientPrivilege):
                 with psycopg.connect(_dsn(caller),row_factory=dict_row) as cx:
                     cx.execute(command)
+
+    # v3.3: exercise REAL alternating database logins through a short-lived,
+    # tenant-bound connection gateway; no shared session/role/GUC persists.
+    router = TenantSessionRouter(os.environ, profile.logins)
+    for tenant in (a.tenant_id, b.tenant_id, a.tenant_id, b.tenant_id):
+        other = b.tenant_id if tenant == a.tenant_id else a.tenant_id
+        with router.open_for_authenticated_tenant(tenant) as scoped:
+            assert scoped.execute('SELECT COUNT(*) AS n FROM public.students').fetchone()['n'] == 1
+            assert scoped.execute('SELECT COUNT(*) AS n FROM public.students WHERE tenant_id=%s',
+                                  (other,)).fetchone()['n'] == 0
+        assert scoped.closed
+    with pytest.raises(ValueError, match='unrecognized'):
+        with router.open_for_authenticated_tenant('tenant-from-user-controlled-body'):
+            pytest.fail('An arbitrary tenant must never receive a connection')
+    # An interrupted write must roll back rather than carry over to the next
+    # tenant's request/connection (or to a retry by the same tenant).
+    rolled_back_id = 'ci-rollback-' + uuid4().hex
+    with pytest.raises(RuntimeError, match='synthetic interruption'):
+        with router.open_for_authenticated_tenant(a.tenant_id) as scoped:
+            scoped.execute('''INSERT INTO public.students(id,tenant_id,pseudonym,cohort,created_at)
+                VALUES(%s,%s,%s,%s,%s)''', (rolled_back_id,a.tenant_id,'Synthetic aborted','U6',TS))
+            raise RuntimeError('synthetic interruption')
+    assert scoped.closed
+    with router.open_for_authenticated_tenant(a.tenant_id) as scoped:
+        assert scoped.execute('SELECT COUNT(*) AS n FROM public.students WHERE id=%s',
+                              (rolled_back_id,)).fetchone()['n'] == 0
 
     # Independently confirm no forbidden mutation, using the CI-only superuser
     # (which BY DESIGN bypasses RLS) solely for this synthetic verification.

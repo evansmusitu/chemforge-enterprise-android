@@ -121,3 +121,14 @@ permissions, and must never be used on live or student data. Global
 `oidc_auth_flows` and migration metadata intentionally have no permissions
 for the school-scoped test roles. These restrictions are not production
 ready. See `docs/POSTGRES_APPLICATION_RLS_v3.2.md`.
+
+## v3.3 — synthetic tenant-bound database sessions (not deployed)
+
+A new local/CI-only `TenantSessionRouter` proves fresh, identity-attested
+PostgreSQL sessions for two synthetic schools with distinct test LOGINs.
+Alternating-school requests cannot inherit another school's database identity;
+an interrupted write is rolled back. Tests run against disposable PostgreSQL 17
+with app-table RLS. See `docs/POSTGRES_BOUND_SESSION_PROBE_v3.3.md`.
+**This is not wired into FastAPI and does not authenticate request-supplied
+school IDs.** The Neon Free database stays network-locked, real student data
+is prohibited, and the zero-dollar non-deployment contract remains binding.
