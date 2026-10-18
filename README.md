@@ -109,3 +109,15 @@ API, production user identity, or real student information.
 proof using two independent PostgreSQL login credentials and synthetic rows.
 This does NOT enable RLS for the application tables or public hosted hosting;
 all Neon remote access restrictions remain unchanged.
+
+## v3.2 — app-table tenant row-level-security research, CI only
+
+Eleven **real synthetic application tables** (including `tenants`,
+`students`, `actors`, `evidence`, `devices`, `audit` and other scoped tables)
+now have an **experimental disposable-only** PostgreSQL RLS qualification:
+independent authenticated school logins cannot read/write each other's rows.
+This policy installer is not wired to the public backend, changes no Neon
+permissions, and must never be used on live or student data. Global
+`oidc_auth_flows` and migration metadata intentionally have no permissions
+for the school-scoped test roles. These restrictions are not production
+ready. See `docs/POSTGRES_APPLICATION_RLS_v3.2.md`.
