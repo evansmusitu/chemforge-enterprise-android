@@ -46,7 +46,7 @@ between authenticated user, school tenant and database role, including shared
 identity-provider flows, onboarding, job accounts, and per-tenant connection
 pooling. Add policy coverage on every table that can hold cross-tenant data,
 resolve global OIDC flow records separately, and run the full application
-regressions through the actual restricted roles. Review owner bypass, backups,
+regressions through the actual restricted roles. Review superuser / BYPASSRLS privilege bypass (even when FORCE RLS is set), backups,
 migrations, SECURITY DEFINER functions, role defaults, credential rotation,
 function EXECUTE permission, and privilege escalation. A blocked Neon Free
 project does **not** itself supply a working private application route.

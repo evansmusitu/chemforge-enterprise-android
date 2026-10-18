@@ -74,9 +74,14 @@ def test_real_separate_login_connections_enforce_tenant_rows():
         # Verify deny/no-mutation effects independently of the restricted views.
         rows=cx.execute('SELECT tenant_id,record_id,payload FROM public.chemforge_ci_rls_probe '
                         'ORDER BY tenant_id').fetchall()
-        # Force RLS applies to owner; owner has no principal binding. Query via
-        # privileged non-RLS bypass is deliberately unavailable in this probe.
-        assert rows == []
+        # The disposable PostgreSQL Docker POSTGRES_USER is a superuser;
+        # PostgreSQL superusers bypass RLS even on FORCE-enabled tables.
+        # The two non-superuser independent LOGINs above are the security proof.
+        assert cx.execute("SELECT rolsuper AS flag FROM pg_roles WHERE rolname=current_user").fetchone()['flag'] is True
+        assert rows == [
+            {'tenant_id': a.tenant_id, 'record_id': row_a, 'payload': 'synthetic-a'},
+            {'tenant_id': b.tenant_id, 'record_id': row_b, 'payload': 'synthetic-b'},
+        ]
     with psycopg.connect(_dsn(a), row_factory=dict_row) as cx:
         assert cx.execute('SELECT payload FROM public.chemforge_ci_rls_probe '
                           'WHERE tenant_id=%s',(a.tenant_id,)).fetchone()['payload']=='synthetic-a'
