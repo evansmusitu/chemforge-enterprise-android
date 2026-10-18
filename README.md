@@ -69,3 +69,11 @@ was verified empty before blocking. No FastAPI process, migrations, credentials,
 student records or public API were deployed. The offline/CI-only attestation
 gate cannot authorize hosting or confirm ongoing provider settings. See
 `docs/NEON_SYNTHETIC_STAGING_v2.7.md`.
+
+## v2.8: Neon TLS profile checked offline (remote access remains BLOCKED)
+
+The guarded staging preflight can validate a future Neon TLS DSN shape without
+connecting or exposing a password. The dedicated Neon Free project remains
+publicly blocked, no runtime can use its remote credentials, and the offline
+student APK and unverified evidence boundaries are unchanged.
+See [docs/NEON_TLS_PREFLIGHT_v2.8.md](docs/NEON_TLS_PREFLIGHT_v2.8.md).

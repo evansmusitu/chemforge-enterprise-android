@@ -8,8 +8,11 @@ on:
       - 'docs/NEON_SYNTHETIC_STAGING_v2.7.md'
       - 'tools/zero_budget_gate.py'
       - 'tools/neon_staging_gate.py'
+      - 'tools/neon_tls_preflight.py'
       - 'tests/deployment/test_zero_budget_gate.py'
       - 'tests/deployment/test_neon_staging_v27.py'
+      - 'tests/deployment/test_neon_tls_preflight_v28.py'
+      - 'docs/NEON_TLS_PREFLIGHT_v2.8.md'
       - '.github/workflows/zero-budget-plan-guard.yml'
   pull_request:
     paths:
@@ -19,8 +22,11 @@ on:
       - 'docs/NEON_SYNTHETIC_STAGING_v2.7.md'
       - 'tools/zero_budget_gate.py'
       - 'tools/neon_staging_gate.py'
+      - 'tools/neon_tls_preflight.py'
       - 'tests/deployment/test_zero_budget_gate.py'
       - 'tests/deployment/test_neon_staging_v27.py'
+      - 'tests/deployment/test_neon_tls_preflight_v28.py'
+      - 'docs/NEON_TLS_PREFLIGHT_v2.8.md'
       - '.github/workflows/zero-budget-plan-guard.yml'
   workflow_dispatch:
 permissions:
@@ -40,6 +46,20 @@ jobs:
         run: python -m pytest -q tests/deployment
       - name: Validate historical locked Neon attestation (offline)
         run: python tools/neon_staging_gate.py --evidence deployment/neon_synthetic_staging_evidence_v27.json
+      - name: Reject unsafe remote TLS profiles without network access
+        env:
+          CHEMFORGE_NEON_TLS_DRY_RUN_DSN: 'postgresql://chemforge_synthetic:FAKE_TEST_PWD_NEVER_USE_123456@ep-chemforge-example.c-7.us-east-2.aws.neon.tech:5432/chemforge_synthetic?sslmode=verify-full&sslrootcert=system'
+        run: |
+          python -m tools.neon_tls_preflight > /tmp/chemforge-tls-profile.json
+          python - <<'PY_CHECK'
+          import json
+          p = json.load(open('/tmp/chemforge-tls-profile.json'))
+          assert p['status'] == 'TLS_PROFILE_VALID_NOT_CONNECTED'
+          assert p['connection_attempted'] is False
+          assert p['certificate_verified'] is False
+          assert p['deployment_allowed'] is False
+          assert p['real_student_data_allowed'] is False
+          PY_CHECK
       - name: Check fail-closed $0 contract
         run: python tools/zero_budget_gate.py --contract deployment/zero_budget_contract.json
       - name: Verify deployment attempt remains blocked
