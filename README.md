@@ -89,3 +89,16 @@ backend is not yet qualified. See `docs/POSTGRES_ROLE_LEAST_PRIVILEGE_v2.9.md`.
 
 The $0 budget, blocked public Neon access, explicit-consent connected QA,
 fully offline default APK, and no-real-student-data gates remain unchanged.
+
+## v3.0 synthetic database LOGIN qualification (not hosted)
+
+A **real restricted PostgreSQL LOGIN**, using an ephemeral test-only password,
+now exercises FastAPI and tenant-scoped reads/writes within a disposable local
+PostgreSQL 17 GitHub Actions container. Its NOLOGIN parent group is limited to
+application tables and append-only audit; the login cannot perform schema DDL,
+change audit history, update migration versions or impersonate the owner.
+`tools/postgres_login_gate.py` is guarded against live Neon connections and
+never emits a credential into project files or Actions logs. See
+`docs/DISPOSABLE_POSTGRES_LOGIN_v3.0.md`. The separate locked Neon Free project
+is unchanged and still unreachable publicly. This does **not** enable a remote
+API, production user identity, or real student information.

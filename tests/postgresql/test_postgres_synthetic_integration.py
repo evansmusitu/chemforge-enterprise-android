@@ -180,7 +180,7 @@ def test_postgres_oidc_flow_capacity_and_expiry_cleanup(pg, monkeypatch):
         assert client.get('/auth/start', follow_redirects=False).status_code == 302
 
 
-def test_postgres_ci_runtime_role_is_least_privileged_and_audit_append_only(pg):
+def test_postgres_ci_runtime_role_is_least_privileged_and_audit_append_only(pg, monkeypatch):
     """Real disposable PostgreSQL17: runtime can read/write learning data,
     never gain schema DDL or mutate audit history / migration records.
     """
@@ -232,3 +232,47 @@ def test_postgres_ci_runtime_role_is_least_privileged_and_audit_append_only(pg):
         cx.execute('SET LOCAL ROLE chemforge_ci_runtime')
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cx.execute("UPDATE chemforge_schema_versions SET sha256='forbidden' WHERE FALSE")
+
+
+    # v3.0: verify a REAL independent LOGIN, not SET ROLE impersonation on
+    # the privileged owner connection. This account must run FastAPI while
+    # remaining incapable of migration DDL and audit-history modification.
+    from tools.postgres_login_gate import provision_disposable_login
+    from psycopg.rows import dict_row
+    with pg.connect() as cx:
+        login = provision_disposable_login(os.environ, cx)
+    runtime_dsn = (f'postgresql://{login.username}:{login.password}'
+                   '@127.0.0.1:5432/chemforge_synthetic?sslmode=disable')
+    assert validate_configuration({**os.environ,'CHEMFORGE_PG_DSN':runtime_dsn}) == runtime_dsn
+    with psycopg.connect(runtime_dsn, row_factory=dict_row, connect_timeout=5) as cx:
+        observed = cx.execute('SELECT current_user AS actor, session_user AS login').fetchone()
+        assert observed == {'actor':'chemforge_ci_app', 'login':'chemforge_ci_app'}
+        assert cx.execute('SELECT COUNT(*) AS count FROM students').fetchone()['count'] >= 0
+
+    for forbidden in (
+        'CREATE TABLE chemforge_disallowed_from_real_login (id TEXT)',
+        "UPDATE audit SET action='forbidden' WHERE FALSE",
+        "DELETE FROM audit WHERE FALSE",
+        "UPDATE chemforge_schema_versions SET sha256='forbidden' WHERE FALSE",
+        'SET ROLE chemforge_synthetic',
+    ):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with psycopg.connect(runtime_dsn, row_factory=dict_row, connect_timeout=5) as cx:
+                cx.execute(forbidden)
+
+    monkeypatch.setenv('CHEMFORGE_PG_DSN', runtime_dsn)
+    runtime = PostgresSyntheticDatabase(os.environ)
+    tenant = 'login-ci-' + uuid4().hex[:9]
+    admin_token = runtime.bootstrap_tenant(tenant,'Disposable test admin')
+    with TestClient(create_app()) as client:
+        user = client.get('/v1/me',headers=headers(admin_token))
+        assert user.status_code == 200, user.text
+        added=client.post('/v1/students',headers=headers(admin_token),
+                          json={'pseudonym':'Synthetic child A', 'cohort':'U6'})
+        assert added.status_code == 201, added.text
+        students = client.get('/v1/students',headers=headers(admin_token))
+        assert students.status_code == 200 and len(students.json()) == 1
+    with runtime.connect() as cx:
+        assert cx.execute('SELECT current_user AS actor').fetchone()['actor'] == login.username
+        assert cx.execute('SELECT COUNT(*) AS n FROM audit WHERE tenant_id=?',
+                          (tenant,)).fetchone()['n'] >= 1
