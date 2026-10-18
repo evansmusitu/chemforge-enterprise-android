@@ -7,6 +7,7 @@ on:
       - 'tools/postgres_restore_drill.py'
       - 'tools/postgres_role_gate.py'
       - 'tools/postgres_login_gate.py'
+      - 'tools/postgres_tenant_rls_gate.py'
       - '.github/workflows/postgres-synthetic-qualification.yml'
   pull_request:
     paths:
@@ -15,6 +16,7 @@ on:
       - 'tools/postgres_restore_drill.py'
       - 'tools/postgres_role_gate.py'
       - 'tools/postgres_login_gate.py'
+      - 'tools/postgres_tenant_rls_gate.py'
       - '.github/workflows/postgres-synthetic-qualification.yml'
   workflow_dispatch:
 permissions:
@@ -49,7 +51,7 @@ jobs:
       - name: Install CI-only Postgres adapter dependencies
         run: python -m pip install -r control_plane/requirements.txt 'psycopg[binary]>=3.2,<4' 'pytest>=8,<10'
       - name: Confirm safe backend configuration and disposable database permission regressions
-        run: python -m pytest -q tests/deployment/test_pg_login_gate_v30.py tests/postgresql
+        run: python -m pytest -q tests/deployment/test_pg_login_gate_v30.py tests/postgresql --ignore=tests/postgresql/test_postgres_tenant_rls_v31.py
       - name: Provision separate *empty* disposable restore database
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
@@ -78,6 +80,8 @@ jobs:
         env:
           CHEMFORGE_PG_RESTORE_DSN: postgresql://chemforge_synthetic:synthetic_ci_only_not_a_real_secret@127.0.0.1:5432/chemforge_synthetic_restore?sslmode=disable
         run: python -m tools.postgres_restore_drill --phase verify
+      - name: Prove authenticated PostgreSQL tenant row-level isolation (isolated probe only)
+        run: python -m pytest -q tests/deployment/test_pg_tenant_rls_gate_v31.py tests/postgresql/test_postgres_tenant_rls_v31.py
       - name: Delete ephemeral backup file even on test failure
         if: always()
         run: rm -f "$RUNNER_TEMP/chemforge-synthetic-native/disposable.backup"

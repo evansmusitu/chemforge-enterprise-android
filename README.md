@@ -102,3 +102,10 @@ never emits a credential into project files or Actions logs. See
 `docs/DISPOSABLE_POSTGRES_LOGIN_v3.0.md`. The separate locked Neon Free project
 is unchanged and still unreachable publicly. This does **not** enable a remote
 API, production user identity, or real student information.
+
+## v3.1 — authenticated PostgreSQL tenant isolation experiment
+
+`docs/POSTGRES_RLS_DISPOSABLE_PROBE_v3.1.md` describes an isolated CI-only RLS
+proof using two independent PostgreSQL login credentials and synthetic rows.
+This does NOT enable RLS for the application tables or public hosted hosting;
+all Neon remote access restrictions remain unchanged.
