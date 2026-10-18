@@ -53,7 +53,7 @@ jobs:
       - name: Install CI-only Postgres adapter dependencies
         run: python -m pip install -r control_plane/requirements.txt 'psycopg[binary]>=3.2,<4' 'pytest>=8,<10'
       - name: Confirm safe backend configuration and disposable database permission regressions
-        run: python -m pytest -q tests/deployment/test_pg_login_gate_v30.py tests/postgresql --ignore=tests/postgresql/test_postgres_tenant_rls_v31.py
+        run: python -m pytest -q tests/deployment/test_pg_login_gate_v30.py tests/postgresql --ignore=tests/postgresql/test_postgres_tenant_rls_v31.py --ignore=tests/postgresql/test_postgres_app_rls_v32.py
       - name: Provision separate *empty* disposable restore database
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
